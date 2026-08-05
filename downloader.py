@@ -28,7 +28,7 @@ def _get_default_ydl_opts():
         'nocolor': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'mweb', 'ios', 'web'],
+                'player_client': ['mweb', 'ios', 'android', 'tvhtml5'],
             }
         },
         'http_headers': {
