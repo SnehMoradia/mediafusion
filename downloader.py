@@ -60,9 +60,28 @@ class DownloadManager:
         ydl_opts['extract_flat'] = 'in_playlist'
         ydl_opts['skip_download'] = True
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            
+        info = None
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except Exception as e:
+            err_msg = str(e)
+            if 'list=' not in url and ('Sign in to confirm' in err_msg or 'unavailable' in err_msg or 'ERROR' in err_msg):
+                match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', url)
+                if match:
+                    video_id = match.group(1)
+                    search_item = self._search_youtube_track(f"https://www.youtube.com/watch?v={video_id}")
+                    if search_item:
+                        return {
+                            'is_playlist': False,
+                            'title': search_item['title'],
+                            'uploader': search_item['uploader'],
+                            'thumbnail': search_item['thumbnail'],
+                            'total_items': 1,
+                            'items': [search_item]
+                        }
+            raise e
+
         if not info:
             raise ValueError("Could not fetch information for the provided URL.")
 
