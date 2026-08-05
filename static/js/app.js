@@ -151,47 +151,99 @@ document.addEventListener('DOMContentLoaded', () => {
             cb.addEventListener('change', updateSelectAllState);
         });
 
-        // Add direct download click handlers
-        document.querySelectorAll('.direct-dl-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const button = e.currentTarget;
-                const encodedUrl = button.getAttribute('data-url');
-                const originalText = button.innerHTML;
+    // Client-side Blob download helper (forces local download in browser)
+    async function triggerClientSideDownload(streamUrl, filename, onProgress) {
+        try {
+            const response = await fetch(streamUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const contentLength = +response.headers.get('Content-Length') || 0;
+            const reader = response.body.getReader();
+            const chunks = [];
+            let receivedBytes = 0;
 
-                button.style.pointerEvents = 'none';
-                button.style.opacity = '0.7';
-                button.innerHTML = `Preparing...`;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                receivedBytes += value.length;
 
-                try {
-                    const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
-                    const json = await res.json();
-
-                    if (!res.ok || json.error) {
-                        throw new Error(json.error || 'Failed to extract media stream');
-                    }
-
-                    if (json.download_url) {
-                        const a = document.createElement('a');
-                        a.href = json.download_url;
-                        a.setAttribute('target', '_blank');
-                        a.setAttribute('download', json.filename || 'media.mp4');
-                        document.body.appendChild(a);
-                        a.click();
-                        setTimeout(() => document.body.removeChild(a), 1000);
-                    } else {
-                        throw new Error('Stream URL not available');
-                    }
-                } catch (err) {
-                    alert(`Download Error: ${err.message}`);
-                } finally {
-                    button.style.pointerEvents = 'auto';
-                    button.style.opacity = '1';
-                    button.innerHTML = originalText;
+                if (contentLength > 0 && onProgress) {
+                    const percent = Math.round((receivedBytes / contentLength) * 100);
+                    onProgress(percent);
                 }
-            });
-        });
+            }
+
+            const blob = new Blob(chunks, { type: 'application/octet-stream' });
+            const blobUrl = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename || 'download.mp4';
+            document.body.appendChild(a);
+            a.click();
+
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            }, 1000);
+        } catch (err) {
+            // Fallback for CORS or stream limits: use direct link download trigger
+            const a = document.createElement('a');
+            a.href = streamUrl;
+            a.target = '_blank';
+            a.setAttribute('download', filename || 'download.mp4');
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => document.body.removeChild(a), 1000);
+        }
     }
+
+    // Add direct download click handlers
+    document.querySelectorAll('.direct-dl-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const button = e.currentTarget;
+            const encodedUrl = button.getAttribute('data-url');
+            const itemCardId = button.closest('.video-card')?.id;
+            const itemId = itemCardId ? itemCardId.replace('video-card-', '') : null;
+            const originalText = button.innerHTML;
+
+            button.style.pointerEvents = 'none';
+            button.style.opacity = '0.7';
+            button.innerHTML = `Preparing...`;
+
+            try {
+                const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
+                const json = await res.json();
+
+                if (!res.ok || json.error) {
+                    throw new Error(json.error || 'Failed to extract media stream');
+                }
+
+                if (json.download_url) {
+                    button.innerHTML = `Downloading...`;
+                    await triggerClientSideDownload(json.download_url, json.filename, (percent) => {
+                        if (itemId) {
+                            const fill = document.getElementById(`fill-${itemId}`);
+                            const percentEl = document.getElementById(`percent-${itemId}`);
+                            if (fill) fill.style.width = `${percent}%`;
+                            if (percentEl) percentEl.textContent = `${percent}%`;
+                        }
+                    });
+                } else {
+                    throw new Error('Stream URL not available');
+                }
+            } catch (err) {
+                alert(`Download Error: ${err.message}`);
+            } finally {
+                button.style.pointerEvents = 'auto';
+                button.style.opacity = '1';
+                button.innerHTML = originalText;
+            }
+        });
+    });
+}
 
     function updateDownloadLinks() {
         // No-op for direct extraction
