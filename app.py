@@ -129,6 +129,11 @@ def get_direct_stream_url():
     try:
         ydl_opts = _get_default_ydl_opts()
         ydl_opts['skip_download'] = True
+        ydl_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['mweb', 'ios', 'android']
+            }
+        }
         
         if format_type == 'audio':
             ydl_opts['format'] = '140/ba/b/bestaudio/best'
@@ -174,16 +179,22 @@ def get_direct_stream_url():
             try:
                 search_opts = _get_default_ydl_opts()
                 search_opts['skip_download'] = True
+                search_opts['extractor_args'] = {
+                    'youtube': {
+                        'player_client': ['mweb', 'ios', 'android']
+                    }
+                }
                 search_opts['format'] = '140/ba/b/bestaudio/best' if format_type == 'audio' else '18/22/b/best'
                 with yt_dlp.YoutubeDL(search_opts) as ydl:
-                    info = ydl.extract_info(f"ytsearch1:{v_id}", download=False)
-                    if info and info.get('entries') and len(info['entries']) > 0:
-                        entry = info['entries'][0]
-                        stream_url = entry.get('url')
-                        if not stream_url and entry.get('formats'):
-                            stream_url = entry['formats'][-1].get('url')
+                    info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
+                    if info:
+                        stream_url = info.get('url')
+                        if not stream_url and info.get('requested_formats'):
+                            stream_url = info['requested_formats'][0].get('url')
+                        if not stream_url and info.get('formats'):
+                            stream_url = info['formats'][-1].get('url')
                         if stream_url:
-                            title = entry.get('title') or 'media'
+                            title = info.get('title') or 'media'
                             clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
                             ext = 'mp3' if format_type == 'audio' else 'mp4'
                             return jsonify({
