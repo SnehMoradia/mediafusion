@@ -133,14 +133,18 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
                 stream_url = info['formats'][-1].get('url')
         return stream_url
 
-    fmt_opt = '140/ba/b/bestaudio/best' if format_type == 'audio' else '18/22/b/best'
     primary_err = None
 
-    # Try 1: Standard default options
+    # Strategy 1: Android player client (most reliable on datacenter/cloud IPs)
     try:
         ydl_opts = _get_default_ydl_opts()
         ydl_opts['skip_download'] = True
-        ydl_opts['format'] = fmt_opt
+        ydl_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['android'],
+                'player_skip': ['web', 'web_music', 'mweb']
+            }
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
             url = extract_stream_from_info(info)
@@ -150,17 +154,16 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
     except Exception as e:
         primary_err = e
 
-    # Try 2: Alternative client list (android, ios, mweb)
+    # Strategy 2: Default client setup with flexible format
     try:
         fb_opts = _get_default_ydl_opts()
         fb_opts['skip_download'] = True
         fb_opts['extractor_args'] = {
             'youtube': {
-                'player_client': ['android', 'ios', 'mweb'],
+                'player_client': ['android', 'android_vr', 'ios'],
                 'player_skip': ['web', 'web_music']
             }
         }
-        fb_opts['format'] = fmt_opt
         with yt_dlp.YoutubeDL(fb_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
             url = extract_stream_from_info(info)
@@ -170,14 +173,18 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
     except Exception:
         pass
 
-    # Try 3: Search by Video ID
+    # Strategy 3: Direct video ID search lookup
     match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
     if match:
         v_id = match.group(1)
         try:
             search_opts = _get_default_ydl_opts()
             search_opts['skip_download'] = True
-            search_opts['format'] = fmt_opt
+            search_opts['extractor_args'] = {
+                'youtube': {
+                    'player_client': ['android']
+                }
+            }
             with yt_dlp.YoutubeDL(search_opts) as ydl:
                 info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
                 url = extract_stream_from_info(info)
