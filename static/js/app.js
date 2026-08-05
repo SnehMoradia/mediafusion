@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         items.forEach((item, index) => {
             const durationFormatted = formatDuration(item.duration);
-            const redirectUrl = `/api/download/redirect?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
+            const redirectUrl = `/api/download/proxy?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
             const card = document.createElement('div');
             card.className = 'video-card';
             card.id = `video-card-${item.id}`;
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.direct-dl-btn').forEach(a => {
             const url = a.getAttribute('data-url');
             if (url) {
-                a.href = `/api/download/redirect?url=${url}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
+                a.href = `/api/download/proxy?url=${url}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
             }
         });
     }

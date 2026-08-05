@@ -5,7 +5,8 @@ import tempfile
 import shutil
 import urllib.parse
 import yt_dlp
-from flask import Flask, request, jsonify, render_template, send_file, after_this_request
+import requests
+from flask import Flask, request, jsonify, render_template, send_file, after_this_request, Response, stream_with_context
 from flask_cors import CORS
 from downloader import DownloadManager, _get_default_ydl_opts, FFMPEG_PATH
 
@@ -114,14 +115,16 @@ def open_folder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/download/redirect', methods=['GET'])
-def redirect_download():
+from flask import Flask, request, jsonify, render_template, send_file, after_this_request, Response, stream_with_context
+
+@app.route('/api/download/proxy', methods=['GET'])
+def proxy_download():
     video_url = request.args.get('url', '').strip()
     format_type = request.args.get('format', 'video').strip()
     quality = request.args.get('quality', 'best').strip()
 
     if not video_url:
-        return "URL is required", 400
+        return "URL parameter is required", 400
 
     try:
         ydl_opts = _get_default_ydl_opts()
@@ -158,11 +161,37 @@ def redirect_download():
             if not stream_url:
                 stream_url = info['formats'][-1].get('url')
 
-        if stream_url:
-            from flask import redirect
-            return redirect(stream_url)
-            
-        return "Stream URL not available", 404
+        if not stream_url:
+            return "Stream URL not available", 404
+
+        title = info.get('title') or 'media'
+        clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
+        ext = 'mp3' if format_type == 'audio' else 'mp4'
+        filename = f"{clean_title}.{ext}"
+
+        req_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        }
+
+        r = requests.get(stream_url, headers=req_headers, stream=True)
+        if r.status_code != 200:
+            return f"CDN error: {r.status_code}", 500
+
+        def generate():
+            for chunk in r.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+
+        content_type = 'audio/mpeg' if format_type == 'audio' else 'video/mp4'
+        
+        resp_headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Type': content_type,
+        }
+        if 'Content-Length' in r.headers:
+            resp_headers['Content-Length'] = r.headers['Content-Length']
+
+        return Response(stream_with_context(generate()), headers=resp_headers)
     except Exception as e:
         match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
         if match:
@@ -171,10 +200,24 @@ def redirect_download():
                 with yt_dlp.YoutubeDL(_get_default_ydl_opts()) as ydl:
                     info = ydl.extract_info(f"ytsearch1:{v_id}", download=False)
                     if info and info.get('entries'):
-                        stream_url = info['entries'][0].get('url')
+                        entry = info['entries'][0]
+                        stream_url = entry.get('url')
                         if stream_url:
-                            from flask import redirect
-                            return redirect(stream_url)
+                            title = entry.get('title') or 'media'
+                            clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
+                            filename = f"{clean_title}.mp4"
+                            r = requests.get(stream_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}, stream=True)
+                            def generate_search():
+                                for chunk in r.iter_content(chunk_size=65536):
+                                    if chunk:
+                                        yield chunk
+                            resp_headers = {
+                                'Content-Disposition': f'attachment; filename="{filename}"',
+                                'Content-Type': 'video/mp4',
+                            }
+                            if 'Content-Length' in r.headers:
+                                resp_headers['Content-Length'] = r.headers['Content-Length']
+                            return Response(stream_with_context(generate_search()), headers=resp_headers)
             except Exception:
                 pass
         return clean_error_message(e), 500
