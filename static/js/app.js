@@ -205,14 +205,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Open Folder
-    openFolderBtn.addEventListener('click', () => {
-        const path = outputFolderInput.value.trim();
-        fetch('/api/open-folder', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path })
+    if (openFolderBtn) {
+        openFolderBtn.addEventListener('click', () => {
+            const path = outputFolderInput ? outputFolderInput.value.trim() : defaultOutputDir;
+            fetch('/api/open-folder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path })
+            });
         });
-    });
+    }
 
     // Format selection dropdown update
     formatSelect.addEventListener('change', () => {
