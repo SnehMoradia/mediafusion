@@ -208,6 +208,75 @@ def get_direct_stream_url():
                 pass
         return jsonify({'error': clean_error_message(e)}), 400
 
+@app.route('/api/download/proxy', methods=['GET'])
+def proxy_download():
+    video_url = request.args.get('url', '').strip()
+    format_type = request.args.get('format', 'video').strip()
+    quality = request.args.get('quality', 'best').strip()
+
+    if not video_url:
+        return jsonify({'error': 'URL parameter is required'}), 400
+
+    try:
+        ydl_opts = _get_default_ydl_opts()
+        ydl_opts['skip_download'] = True
+        ydl_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['mweb', 'ios', 'android']
+            }
+        }
+        
+        if format_type == 'audio':
+            ydl_opts['format'] = '140/ba/b/bestaudio/best'
+        else:
+            ydl_opts['format'] = '18/22/b/best'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+
+        if not info:
+            return jsonify({'error': 'Could not extract media stream'}), 400
+
+        stream_url = info.get('url')
+        if not stream_url and info.get('requested_formats'):
+            stream_url = info['requested_formats'][0].get('url')
+        if not stream_url and info.get('formats'):
+            for fmt in reversed(info['formats']):
+                if fmt.get('url') and (fmt.get('vcodec') != 'none' or format_type == 'audio'):
+                    stream_url = fmt['url']
+                    break
+            if not stream_url:
+                stream_url = info['formats'][-1].get('url')
+
+        if not stream_url:
+            return jsonify({'error': 'Stream URL not available'}), 404
+
+        title = info.get('title') or 'media'
+        clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
+        ext = 'mp3' if format_type == 'audio' else 'mp4'
+        filename = f"{clean_title}.{ext}"
+
+        req = requests.get(stream_url, stream=True, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        }, timeout=30)
+
+        def generate():
+            for chunk in req.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+
+        headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Type': req.headers.get('Content-Type', 'application/octet-stream')
+        }
+        if req.headers.get('Content-Length'):
+            headers['Content-Length'] = req.headers.get('Content-Length')
+
+        return Response(stream_with_context(generate()), headers=headers)
+    except Exception as e:
+        return jsonify({'error': clean_error_message(e)}), 400
+
+
 @app.route('/api/download/stream', methods=['GET'])
 def stream_download():
     video_url = request.args.get('url', '').strip()

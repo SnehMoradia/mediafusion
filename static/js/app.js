@@ -153,38 +153,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add direct download click handlers
         document.querySelectorAll('.direct-dl-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
+            btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const button = e.currentTarget;
                 const encodedUrl = button.getAttribute('data-url');
-                button.style.pointerEvents = 'none';
-                button.style.opacity = '0.7';
-                const originalText = button.innerHTML;
-                button.innerHTML = `Extracting...`;
+                const proxyUrl = `/api/download/proxy?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
                 
-                try {
-                    const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
-                    const json = await res.json();
-                    if (!res.ok || !json.download_url) {
-                        throw new Error(json.error || 'Failed to extract media stream');
-                    }
-                    
-                    const a = document.createElement('a');
-                    a.href = json.download_url;
-                    a.setAttribute('referrerpolicy', 'no-referrer');
-                    a.setAttribute('rel', 'noreferrer');
-                    a.setAttribute('target', '_blank');
-                    a.setAttribute('download', json.filename || 'media.mp4');
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => document.body.removeChild(a), 1000);
-                } catch (err) {
-                    alert(`Download Error: ${err.message}`);
-                } finally {
-                    button.style.pointerEvents = 'auto';
-                    button.style.opacity = '1';
-                    button.innerHTML = originalText;
-                }
+                const a = document.createElement('a');
+                a.href = proxyUrl;
+                a.setAttribute('download', '');
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => document.body.removeChild(a), 1000);
             });
         });
     }
