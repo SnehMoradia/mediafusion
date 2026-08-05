@@ -32,17 +32,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isCloudDeployment = false;
 
+    let defaultOutputDir = '';
+
     // Load default output folder
     fetch('/api/default-folder')
         .then(res => res.json())
         .then(data => {
             if (data.is_cloud) {
                 isCloudDeployment = true;
-                outputFolderInput.value = 'Browser Downloads Folder (Default)';
-                outputFolderInput.disabled = true;
+                if (outputFolderInput) {
+                    outputFolderInput.value = 'Browser Downloads Folder';
+                    outputFolderInput.disabled = true;
+                }
                 if (openFolderBtn) openFolderBtn.style.display = 'none';
             } else if (data.path) {
-                outputFolderInput.value = data.path;
+                defaultOutputDir = data.path;
+                if (outputFolderInput) outputFolderInput.value = data.path;
             }
         })
         .catch(console.error);
@@ -265,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
             items: selectedItems,
             format: formatSelect.value,
             quality: qualitySelect.value,
-            output_dir: outputFolderInput.value.trim()
+            output_dir: outputFolderInput ? outputFolderInput.value.trim() : defaultOutputDir
         };
 
         try {
