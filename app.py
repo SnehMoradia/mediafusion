@@ -1,9 +1,13 @@
 import os
 import sys
 import subprocess
-from flask import Flask, request, jsonify, render_template
+import tempfile
+import shutil
+import urllib.parse
+import yt_dlp
+from flask import Flask, request, jsonify, render_template, send_file, after_this_request
 from flask_cors import CORS
-from downloader import DownloadManager
+from downloader import DownloadManager, _get_default_ydl_opts, FFMPEG_PATH
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
@@ -16,8 +20,14 @@ def index():
 
 @app.route('/api/default-folder', methods=['GET'])
 def get_default_folder():
-    default_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'PlaylistDownloads')
-    return jsonify({'path': default_dir})
+    host = request.host.lower()
+    is_cloud = not ('localhost' in host or '127.0.0.1' in host)
+    
+    if is_cloud:
+        return jsonify({'is_cloud': True, 'path': 'Browser Downloads Folder'})
+    else:
+        default_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'PlaylistDownloads')
+        return jsonify({'is_cloud': False, 'path': default_dir})
 
 import re
 
@@ -103,6 +113,75 @@ def open_folder():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/download/stream', methods=['GET'])
+def stream_download():
+    video_url = request.args.get('url', '').strip()
+    format_type = request.args.get('format', 'audio')
+    quality = request.args.get('quality', 'best')
+
+    if not video_url:
+        return jsonify({'error': 'URL is required'}), 400
+
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        ydl_opts = _get_default_ydl_opts()
+        out_tmpl = os.path.join(temp_dir, '%(title)s [%(id)s].%(ext)s')
+        ydl_opts['outtmpl'] = out_tmpl
+
+        if FFMPEG_PATH:
+            ydl_opts['ffmpeg_location'] = FFMPEG_PATH
+
+        if format_type == 'audio':
+            ydl_opts['format'] = 'bestaudio/best'
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320' if quality == 'best' else '192',
+            }]
+        else:
+            if quality == '1080p':
+                ydl_opts['format'] = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'
+            elif quality == '720p':
+                ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
+            elif quality == '480p':
+                ydl_opts['format'] = 'bestvideo[height<=480]+bestaudio/best[height<=480]/best'
+            elif quality == '360p':
+                ydl_opts['format'] = 'bestvideo[height<=360]+bestaudio/best[height<=360]/best'
+            else:
+                ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            ydl_opts['merge_output_format'] = 'mp4'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([video_url])
+
+        downloaded_files = [
+            os.path.join(temp_dir, f) for f in os.listdir(temp_dir)
+            if not f.endswith('.part') and not f.endswith('.ytdl')
+        ]
+        if not downloaded_files:
+            return jsonify({'error': 'Failed to process media file'}), 500
+
+        target_file = downloaded_files[0]
+        filename = os.path.basename(target_file)
+        
+        @after_this_request
+        def cleanup(response):
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+            return response
+
+        return send_file(
+            target_file,
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return jsonify({'error': clean_error_message(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5050))

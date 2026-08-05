@@ -30,11 +30,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeJobId = null;
     let pollInterval = null;
 
+    let isCloudDeployment = false;
+
     // Load default output folder
     fetch('/api/default-folder')
         .then(res => res.json())
         .then(data => {
-            if (data.path) outputFolderInput.value = data.path;
+            if (data.is_cloud) {
+                isCloudDeployment = true;
+                outputFolderInput.value = 'Browser Downloads Folder (Default)';
+                outputFolderInput.disabled = true;
+                if (openFolderBtn) openFolderBtn.style.display = 'none';
+            } else if (data.path) {
+                outputFolderInput.value = data.path;
+            }
         })
         .catch(console.error);
 
@@ -79,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchBtnText.textContent = 'Fetching...';
             fetchSpinner.style.display = 'block';
         } else {
-            fetchBtnText.textContent = 'Fetch Playlist';
+            fetchBtnText.textContent = 'Fetch Media';
             fetchSpinner.style.display = 'none';
         }
     }
@@ -88,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bannerThumb.src = data.thumbnail || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400';
         bannerTitle.textContent = data.title;
         bannerUploader.textContent = `By ${data.uploader}`;
-        bannerCount.textContent = `${data.total_items} Video${data.total_items > 1 ? 's' : ''}`;
+        bannerCount.textContent = `${data.total_items} Item${data.total_items > 1 ? 's' : ''}`;
         playlistBanner.classList.add('active');
     }
 
@@ -114,9 +123,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="item-progress-section">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span class="badge badge-queued" id="badge-${item.id}">Queued</span>
-                        <span style="font-size: 0.75rem; font-family: var(--font-mono); color: var(--text-sub);" id="speed-${item.id}">-</span>
+                        <button class="btn-secondary direct-dl-btn" data-url="${encodeURIComponent(item.url)}" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem;">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Direct Download
+                        </button>
                     </div>
-                    <div class="progress-bar-bg">
+                    <div class="progress-bar-bg" style="margin-top: 0.5rem;">
                         <div class="progress-bar-fill" id="fill-${item.id}"></div>
                     </div>
                     <div class="progress-meta">
@@ -131,6 +143,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add event listeners to individual checkboxes
         document.querySelectorAll('.item-checkbox').forEach(cb => {
             cb.addEventListener('change', updateSelectAllState);
+        });
+
+        // Add direct download click handlers
+        document.querySelectorAll('.direct-dl-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const encodedUrl = e.currentTarget.getAttribute('data-url');
+                const dlUrl = `/api/download/stream?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
+                window.open(dlUrl, '_blank');
+            });
         });
     }
 
@@ -178,9 +199,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!playlistData || !playlistData.items) return;
 
         const selectedIds = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.getAttribute('data-id'));
-        if (selectedIds.length === 0) return alert('Please select at least one video to download.');
+        if (selectedIds.length === 0) return alert('Please select at least one item to download.');
 
         const selectedItems = playlistData.items.filter(item => selectedIds.includes(item.id));
+
+        if (isCloudDeployment) {
+            selectedItems.forEach((item, idx) => {
+                setTimeout(() => {
+                    const dlUrl = `/api/download/stream?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = dlUrl;
+                    document.body.appendChild(iframe);
+                    setTimeout(() => document.body.removeChild(iframe), 60000);
+                }, idx * 1500);
+            });
+            alert(`Started direct browser download for ${selectedItems.length} item(s)! Please check your browser downloads bar.`);
+            return;
+        }
 
         const downloadPayload = {
             items: selectedItems,
