@@ -153,12 +153,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add direct download click handlers
         document.querySelectorAll('.direct-dl-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 const button = e.currentTarget;
                 const encodedUrl = button.getAttribute('data-url');
-                const proxyUrl = `/api/download/proxy?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
-                window.open(proxyUrl, '_blank');
+                const originalText = button.innerHTML;
+
+                button.style.pointerEvents = 'none';
+                button.style.opacity = '0.7';
+                button.innerHTML = `Preparing...`;
+
+                try {
+                    const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
+                    const json = await res.json();
+
+                    if (!res.ok || json.error) {
+                        throw new Error(json.error || 'Failed to extract media stream');
+                    }
+
+                    if (json.download_url) {
+                        const a = document.createElement('a');
+                        a.href = json.download_url;
+                        a.setAttribute('target', '_blank');
+                        a.setAttribute('download', json.filename || 'media.mp4');
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => document.body.removeChild(a), 1000);
+                    } else {
+                        throw new Error('Stream URL not available');
+                    }
+                } catch (err) {
+                    alert(`Download Error: ${err.message}`);
+                } finally {
+                    button.style.pointerEvents = 'auto';
+                    button.style.opacity = '1';
+                    button.innerHTML = originalText;
+                }
             });
         });
     }
