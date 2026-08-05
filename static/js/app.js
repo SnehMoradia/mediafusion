@@ -1,0 +1,301 @@
+document.addEventListener('DOMContentLoaded', () => {
+    // Elements
+    const urlInput = document.getElementById('url-input');
+    const fetchBtn = document.getElementById('fetch-btn');
+    const fetchBtnText = document.getElementById('fetch-btn-text');
+    const fetchSpinner = document.getElementById('fetch-spinner');
+
+    const playlistBanner = document.getElementById('playlist-banner');
+    const bannerThumb = document.getElementById('banner-thumb');
+    const bannerTitle = document.getElementById('banner-title');
+    const bannerUploader = document.getElementById('banner-uploader');
+    const bannerCount = document.getElementById('banner-count');
+
+    const toolbarCard = document.getElementById('toolbar-card');
+    const formatSelect = document.getElementById('format-select');
+    const qualitySelect = document.getElementById('quality-select');
+    const outputFolderInput = document.getElementById('output-folder');
+    const openFolderBtn = document.getElementById('open-folder-btn');
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
+    const startDownloadBtn = document.getElementById('start-download-btn');
+
+    const videosContainer = document.getElementById('videos-container');
+
+    const overallCard = document.getElementById('overall-progress-card');
+    const overallFill = document.getElementById('overall-progress-fill');
+    const overallText = document.getElementById('overall-text');
+    const cancelJobBtn = document.getElementById('cancel-job-btn');
+
+    let playlistData = null;
+    let activeJobId = null;
+    let pollInterval = null;
+
+    // Load default output folder
+    fetch('/api/default-folder')
+        .then(res => res.json())
+        .then(data => {
+            if (data.path) outputFolderInput.value = data.path;
+        })
+        .catch(console.error);
+
+    // Fetch Playlist Info
+    fetchBtn.addEventListener('click', handleFetchPlaylist);
+    urlInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleFetchPlaylist();
+    });
+
+    async function handleFetchPlaylist() {
+        const url = urlInput.value.trim();
+        if (!url) return alert('Please enter a valid playlist or video URL');
+
+        setFetchLoading(true);
+
+        try {
+            const res = await fetch('/api/playlist-info', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+
+            const json = await res.json();
+            if (!res.ok || json.error) {
+                throw new Error(json.error || 'Failed to extract playlist info');
+            }
+
+            playlistData = json.data;
+            renderPlaylistBanner(playlistData);
+            renderVideoList(playlistData.items);
+            toolbarCard.classList.add('active');
+        } catch (err) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setFetchLoading(false);
+        }
+    }
+
+    function setFetchLoading(isLoading) {
+        fetchBtn.disabled = isLoading;
+        if (isLoading) {
+            fetchBtnText.textContent = 'Fetching...';
+            fetchSpinner.style.display = 'block';
+        } else {
+            fetchBtnText.textContent = 'Fetch Playlist';
+            fetchSpinner.style.display = 'none';
+        }
+    }
+
+    function renderPlaylistBanner(data) {
+        bannerThumb.src = data.thumbnail || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400';
+        bannerTitle.textContent = data.title;
+        bannerUploader.textContent = `By ${data.uploader}`;
+        bannerCount.textContent = `${data.total_items} Video${data.total_items > 1 ? 's' : ''}`;
+        playlistBanner.classList.add('active');
+    }
+
+    function renderVideoList(items) {
+        videosContainer.innerHTML = '';
+        selectAllCheckbox.checked = true;
+
+        items.forEach((item, index) => {
+            const durationFormatted = formatDuration(item.duration);
+            const card = document.createElement('div');
+            card.className = 'video-card';
+            card.id = `video-card-${item.id}`;
+            card.innerHTML = `
+                <input type="checkbox" class="checkbox-custom item-checkbox" data-id="${item.id}" checked>
+                <div class="video-thumb-wrapper">
+                    <img src="${item.thumbnail}" class="video-thumb" alt="thumbnail" loading="lazy" />
+                    <span class="video-duration">${durationFormatted}</span>
+                </div>
+                <div class="video-info">
+                    <div class="video-title" title="${item.title}">${index + 1}. ${item.title}</div>
+                    <div class="video-uploader">${item.uploader}</div>
+                </div>
+                <div class="item-progress-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="badge badge-queued" id="badge-${item.id}">Queued</span>
+                        <span style="font-size: 0.75rem; font-family: var(--font-mono); color: var(--text-sub);" id="speed-${item.id}">-</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="fill-${item.id}"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="percent-${item.id}">0%</span>
+                        <span id="eta-${item.id}">-</span>
+                    </div>
+                </div>
+            `;
+            videosContainer.appendChild(card);
+        });
+
+        // Add event listeners to individual checkboxes
+        document.querySelectorAll('.item-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateSelectAllState);
+        });
+    }
+
+    // Select all handler
+    selectAllCheckbox.addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = checked);
+    });
+
+    function updateSelectAllState() {
+        const checkboxes = Array.from(document.querySelectorAll('.item-checkbox'));
+        selectAllCheckbox.checked = checkboxes.every(cb => cb.checked);
+    }
+
+    // Open Folder
+    openFolderBtn.addEventListener('click', () => {
+        const path = outputFolderInput.value.trim();
+        fetch('/api/open-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+        });
+    });
+
+    // Format selection dropdown update
+    formatSelect.addEventListener('change', () => {
+        if (formatSelect.value === 'audio') {
+            qualitySelect.innerHTML = `
+                <option value="best">320 kbps (High Quality)</option>
+                <option value="192">192 kbps (Standard)</option>
+            `;
+        } else {
+            qualitySelect.innerHTML = `
+                <option value="best">Best Available</option>
+                <option value="1080p">1080p Full HD</option>
+                <option value="720p">720p HD</option>
+                <option value="480p">480p SD</option>
+                <option value="360p">360p Low</option>
+            `;
+        }
+    });
+
+    // Start Download
+    startDownloadBtn.addEventListener('click', async () => {
+        if (!playlistData || !playlistData.items) return;
+
+        const selectedIds = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.getAttribute('data-id'));
+        if (selectedIds.length === 0) return alert('Please select at least one video to download.');
+
+        const selectedItems = playlistData.items.filter(item => selectedIds.includes(item.id));
+
+        const downloadPayload = {
+            items: selectedItems,
+            format: formatSelect.value,
+            quality: qualitySelect.value,
+            output_dir: outputFolderInput.value.trim()
+        };
+
+        try {
+            startDownloadBtn.disabled = true;
+            startDownloadBtn.innerHTML = `Downloading...`;
+
+            const res = await fetch('/api/download/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(downloadPayload)
+            });
+
+            const json = await res.json();
+            if (!res.ok || json.error) throw new Error(json.error || 'Failed to start download');
+
+            activeJobId = json.job_id;
+            overallCard.classList.add('active');
+            startPollingProgress();
+        } catch (err) {
+            alert(`Download Error: ${err.message}`);
+            startDownloadBtn.disabled = false;
+            startDownloadBtn.innerHTML = `Start Download`;
+        }
+    });
+
+    // Poll Download Progress
+    function startPollingProgress() {
+        if (pollInterval) clearInterval(pollInterval);
+
+        pollInterval = setInterval(async () => {
+            if (!activeJobId) return;
+
+            try {
+                const res = await fetch(`/api/download/status/${activeJobId}`);
+                const json = await res.json();
+
+                if (!json.success || !json.job) return;
+
+                const job = json.job;
+                updateProgressUI(job);
+
+                if (job.status === 'completed' || job.status === 'cancelled' || job.status === 'error') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    startDownloadBtn.disabled = false;
+                    startDownloadBtn.innerHTML = `Start Download`;
+                    
+                    if (job.status === 'completed') {
+                        overallText.textContent = `Completed ${job.completed_items} of ${job.total_items} downloads!`;
+                        setTimeout(() => overallCard.classList.remove('active'), 5000);
+                    }
+                }
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        }, 600);
+    }
+
+    function updateProgressUI(job) {
+        // Overall bar
+        const total = job.total_items;
+        const finished = job.completed_items;
+        const overallPercent = total > 0 ? Math.round((finished / total) * 100) : 0;
+
+        overallFill.style.width = `${overallPercent}%`;
+        overallText.textContent = `Downloading ${finished} / ${total} items (${overallPercent}%)`;
+
+        // Update items
+        Object.values(job.items_status).forEach(item => {
+            const fill = document.getElementById(`fill-${item.id}`);
+            const percent = document.getElementById(`percent-${item.id}`);
+            const badge = document.getElementById(`badge-${item.id}`);
+            const speed = document.getElementById(`speed-${item.id}`);
+            const eta = document.getElementById(`eta-${item.id}`);
+
+            if (fill) fill.style.width = `${item.progress}%`;
+            if (percent) percent.textContent = `${item.progress}%`;
+            if (speed) speed.textContent = item.speed || '-';
+            if (eta) eta.textContent = item.eta ? `ETA: ${item.eta}` : '-';
+
+            if (badge) {
+                badge.className = `badge badge-${item.status}`;
+                badge.textContent = item.status.toUpperCase();
+            }
+        });
+    }
+
+    // Cancel Download
+    cancelJobBtn.addEventListener('click', async () => {
+        if (!activeJobId) return;
+
+        fetch(`/api/download/cancel/${activeJobId}`, { method: 'POST' });
+        clearInterval(pollInterval);
+        overallCard.classList.remove('active');
+        startDownloadBtn.disabled = false;
+        startDownloadBtn.innerHTML = `Start Download`;
+    });
+
+    // Helper
+    function formatDuration(seconds) {
+        if (!seconds) return '--:--';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        const h = Math.floor(m / 60);
+        const rm = m % 60;
+
+        if (h > 0) {
+            return `${h}:${rm < 10 ? '0' : ''}${rm}:${s < 10 ? '0' : ''}${s}`;
+        }
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+});
