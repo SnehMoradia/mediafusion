@@ -137,12 +137,14 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
                     return fmt['url']
         return info.get('url')
 
+    fmt_opt = '140/ba/b/bestaudio/best' if format_type == 'audio' else '18/22/b/best'
     primary_err = None
 
     # Strategy 1: Android player client (most reliable on datacenter/cloud IPs)
     try:
         ydl_opts = _get_default_ydl_opts()
         ydl_opts['skip_download'] = True
+        ydl_opts['format'] = fmt_opt
         ydl_opts['extractor_args'] = {
             'youtube': {
                 'player_client': ['android'],
@@ -162,6 +164,7 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
     try:
         fb_opts = _get_default_ydl_opts()
         fb_opts['skip_download'] = True
+        fb_opts['format'] = fmt_opt
         fb_opts['extractor_args'] = {
             'youtube': {
                 'player_client': ['android', 'android_vr', 'ios'],
@@ -184,6 +187,7 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
         try:
             search_opts = _get_default_ydl_opts()
             search_opts['skip_download'] = True
+            search_opts['format'] = fmt_opt
             search_opts['extractor_args'] = {
                 'youtube': {
                     'player_client': ['android']
