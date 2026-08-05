@@ -131,18 +131,9 @@ def get_direct_stream_url():
         ydl_opts['skip_download'] = True
         
         if format_type == 'audio':
-            ydl_opts['format'] = '140/ba/bestaudio/best'
+            ydl_opts['format'] = '140/ba/b/bestaudio/best'
         else:
-            if quality == '1080p':
-                ydl_opts['format'] = '22/bestvideo[height<=1080]+bestaudio/18/best'
-            elif quality == '720p':
-                ydl_opts['format'] = '22/bestvideo[height<=720]+bestaudio/18/best'
-            elif quality == '480p':
-                ydl_opts['format'] = '18/bestvideo[height<=480]+bestaudio/best'
-            elif quality == '360p':
-                ydl_opts['format'] = '18/best'
-            else:
-                ydl_opts['format'] = '22/18/best'
+            ydl_opts['format'] = '18/22/b/best'
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
@@ -181,20 +172,27 @@ def get_direct_stream_url():
         if match:
             v_id = match.group(1)
             try:
-                with yt_dlp.YoutubeDL(_get_default_ydl_opts()) as ydl:
+                search_opts = _get_default_ydl_opts()
+                search_opts['skip_download'] = True
+                search_opts['format'] = '140/ba/b/bestaudio/best' if format_type == 'audio' else '18/22/b/best'
+                with yt_dlp.YoutubeDL(search_opts) as ydl:
                     info = ydl.extract_info(f"ytsearch1:{v_id}", download=False)
-                    if info and info.get('entries'):
+                    if info and info.get('entries') and len(info['entries']) > 0:
                         entry = info['entries'][0]
                         stream_url = entry.get('url')
-                        title = entry.get('title') or 'media'
-                        clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
-                        return jsonify({
-                            'success': True,
-                            'download_url': stream_url,
-                            'title': title,
-                            'filename': f"{clean_title}.mp4",
-                            'ext': 'mp4'
-                        })
+                        if not stream_url and entry.get('formats'):
+                            stream_url = entry['formats'][-1].get('url')
+                        if stream_url:
+                            title = entry.get('title') or 'media'
+                            clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
+                            ext = 'mp3' if format_type == 'audio' else 'mp4'
+                            return jsonify({
+                                'success': True,
+                                'download_url': stream_url,
+                                'title': title,
+                                'filename': f"{clean_title}.{ext}",
+                                'ext': ext
+                            })
             except Exception:
                 pass
         return jsonify({'error': clean_error_message(e)}), 400
