@@ -217,26 +217,9 @@ def proxy_download():
     if not video_url:
         return jsonify({'error': 'URL parameter is required'}), 400
 
-    try:
-        ydl_opts = _get_default_ydl_opts()
-        ydl_opts['skip_download'] = True
-        ydl_opts['extractor_args'] = {
-            'youtube': {
-                'player_client': ['mweb', 'ios', 'android']
-            }
-        }
-        
-        if format_type == 'audio':
-            ydl_opts['format'] = '140/ba/b/bestaudio/best'
-        else:
-            ydl_opts['format'] = '18/22/b/best'
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-
+    def extract_stream_from_info(info):
         if not info:
-            return jsonify({'error': 'Could not extract media stream'}), 400
-
+            return None
         stream_url = info.get('url')
         if not stream_url and info.get('requested_formats'):
             stream_url = info['requested_formats'][0].get('url')
@@ -247,13 +230,62 @@ def proxy_download():
                     break
             if not stream_url:
                 stream_url = info['formats'][-1].get('url')
+        return stream_url
 
-        if not stream_url:
-            return jsonify({'error': 'Stream URL not available'}), 404
+    primary_err = None
+    try:
+        ydl_opts = _get_default_ydl_opts()
+        ydl_opts['skip_download'] = True
+        if format_type == 'audio':
+            ydl_opts['format'] = '140/ba/b/bestaudio/best'
+        else:
+            ydl_opts['format'] = '18/22/b/best'
 
-        return redirect(stream_url)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+
+        stream_url = extract_stream_from_info(info)
+        if stream_url:
+            return redirect(stream_url)
     except Exception as e:
-        return jsonify({'error': clean_error_message(e)}), 400
+        primary_err = e
+
+    # Fallback 1: Retrying with alternate client list (tvhtml5, ios, android)
+    try:
+        fb_opts = _get_default_ydl_opts()
+        fb_opts['skip_download'] = True
+        fb_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['tvhtml5', 'android', 'ios'],
+                'player_skip': ['web', 'web_music']
+            }
+        }
+        fb_opts['format'] = '140/ba/b/bestaudio/best' if format_type == 'audio' else '18/22/b/best'
+        with yt_dlp.YoutubeDL(fb_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+        stream_url = extract_stream_from_info(info)
+        if stream_url:
+            return redirect(stream_url)
+    except Exception:
+        pass
+
+    # Fallback 2: Extract video ID and query YouTube search URL
+    match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
+    if match:
+        v_id = match.group(1)
+        try:
+            search_opts = _get_default_ydl_opts()
+            search_opts['skip_download'] = True
+            search_opts['format'] = '140/ba/b/bestaudio/best' if format_type == 'audio' else '18/22/b/best'
+            with yt_dlp.YoutubeDL(search_opts) as ydl:
+                info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
+                stream_url = extract_stream_from_info(info)
+                if stream_url:
+                    return redirect(stream_url)
+        except Exception:
+            pass
+
+    return jsonify({'error': clean_error_message(primary_err or "Could not extract media stream")}), 400
 
 
 @app.route('/api/download/stream', methods=['GET'])
