@@ -9,133 +9,56 @@
   Download playlists, videos, reels, and audio tracks in high-definition MP4 video or 320kbps MP3 audio.
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/Flask-3.0%2B-000000?style=for-the-badge&logo=flask&logoColor=white" alt="Flask" />
-  <img src="https://img.shields.io/badge/yt--dlp-Latest-red?style=for-the-badge&logo=youtube&logoColor=white" alt="yt-dlp" />
-  <img src="https://img.shields.io/badge/FFmpeg-Supported-green?style=for-the-badge&logo=ffmpeg&logoColor=white" alt="FFmpeg" />
-  <img src="https://img.shields.io/badge/Vercel-Configured-black?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel" />
-</p>
+---
+
+## 📖 User Guide (How to Use)
+
+### 🚀 1. Opening the App
+* Double-click the **`run.bat`** file on your computer.
+* Your web browser will open automatically to `http://localhost:5050`.
 
 ---
 
-## ✨ Features
-
-- 🎥 **YouTube Downloader**: Download entire Playlists, single videos, YouTube Shorts, or channels in HD MP4 (1080p, 720p, 480p, 360p) or high-bitrate MP3.
-- 📸 **Instagram Reels & Posts**: Download Instagram Reels, Video posts, and IGTV clips directly.
-- 🎧 **Spotify Tracks, Playlists & Albums**: Paste any Spotify URL to extract track metadata and download pristine audio tracks.
-- 🎼 **True MP3 Audio Extraction**: Automatic conversion using bundled **FFmpeg** (`imageio-ffmpeg`) for crisp, real `.mp3` files (not `.webm`).
-- ⚡ **Real-Time Progress & Speed**: Live download speed (MB/s), percent completed, ETA countdown, and batch progress tracking.
-- 🎨 **Glassmorphism UI**: Premium dark mode design built with modern CSS, vibrant gradients, and smooth micro-animations.
-- 📂 **Custom Download Folder**: Choose custom save directories or auto-save directly to your system's `Downloads` folder.
+### 🎥 2. Downloading YouTube Videos & Playlists
+1. Copy any **YouTube Video**, **Playlist**, **Shorts**, or **Channel** link from your browser or app.
+2. Paste the link into the search bar at the top of MediaFusion.
+3. Click **Fetch Media** to load the video list.
+4. Select your preferred format: **Video (MP4)** or **Audio (MP3)**.
+5. Select your quality preference (e.g. 1080p Full HD, 720p HD, 480p, 360p).
+6. Click **Start Download**.
 
 ---
 
-## 🛠️ Technology Stack
-
-- **Backend**: Python 3.10+, Flask, Flask-CORS
-- **Download Engine**: `yt-dlp`, `imageio-ffmpeg` (bundled FFmpeg binary)
-- **Metadata Parsers**: `requests`, Spotify oEmbed API & Embed Parser
-- **Frontend**: Vanilla HTML5, Modern CSS3 (Glassmorphism design system), JavaScript (Async/Await Fetch & Polling API)
-
----
-
-## 🚀 Quick Start (Local Setup)
-
-### Option 1: Automatic 1-Click Launch (Windows)
-
-Simply double-click `run.bat` or execute in terminal:
-
-```cmd
-.\run.bat
-```
-
-> **What `run.bat` does:**
-> 1. Automatically creates a Python virtual environment (`venv`) if needed.
-> 2. Installs required dependencies from `requirements.txt`.
-> 3. Launches your browser to `http://localhost:5050`.
-> 4. Starts the local Flask server.
+### 📸 3. Downloading Instagram Reels & Posts
+1. Copy the link of any **Instagram Reel**, **Video Post**, or **IGTV clip**.
+2. Paste the link into MediaFusion and click **Fetch Media**.
+3. Choose whether you want to save it as an **MP4 Video** or convert the audio to **MP3**.
+4. Click **Start Download**.
 
 ---
 
-### Option 2: Manual Setup
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/SnehMoradia/mediafusion.git
-   cd mediafusion
-   ```
-
-2. **Create and activate a virtual environment**:
-   ```bash
-   # On Windows
-   python -m venv venv
-   venv\Scripts\activate
-
-   # On macOS/Linux
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run the Flask application**:
-   ```bash
-   python app.py
-   ```
-
-5. Open [http://localhost:5050](http://localhost:5050) in your browser.
+### 🎧 4. Downloading Spotify Tracks, Playlists & Albums
+1. Copy the link of any **Spotify Track**, **Playlist**, or **Album**.
+2. Paste the link into MediaFusion and click **Fetch Media**.
+3. MediaFusion automatically extracts track information and matches high-quality audio streams.
+4. Select **Audio (MP3)** and click **Start Download**.
 
 ---
 
-## 📂 Project Structure
-
-```
-playlistdownloader/
-├── app.py                  # Main Flask application & API routes
-├── downloader.py           # Multi-platform extraction & background download engine
-├── requirements.txt        # Python dependencies
-├── run.bat                 # Windows automatic launcher script
-├── vercel.json             # Vercel Serverless deployment configuration
-├── render.yaml             # Render 1-click cloud deployment manifest
-├── .gitignore              # Git ignore rules
-├── api/
-│   └── index.py            # Vercel Serverless function entrypoint
-├── static/
-│   ├── css/
-│   │   └── style.css       # Complete UI design system & Glassmorphism styles
-│   └── js/
-│       └── app.js          # Interactive frontend logic & progress tracking
-└── templates/
-    └── index.html          # Web application UI template
-```
+### 📂 5. Accessing Your Downloaded Files
+* All downloaded files are saved directly in your system's **Downloads/PlaylistDownloads** folder.
+* Click the **Open** button inside the app toolbar at any time to open your downloads folder directly in File Explorer.
 
 ---
 
-## ☁️ Deployment Guide
+## ✨ Highlights & Features
 
-### Deploying to Vercel
-
-1. Push your repository to GitHub.
-2. Log into [Vercel](https://vercel.com/) and click **Add New Project**.
-3. Import your `SnehMoradia/mediafusion` GitHub repository.
-4. Vercel automatically detects `vercel.json` and builds the `@vercel/python` function.
-5. Click **Deploy**!
-
-### Deploying to Render / Railway / Koyeb
-
-For long-running batch video downloads without serverless timeouts:
-1. Connect your repository to **[Render.com](https://render.com/)**.
-2. Render automatically reads `render.yaml` and deploys using `gunicorn app:app`.
-
----
-
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
+- 🎥 **YouTube**: Support for Playlists, Videos, Shorts, and Channels.
+- 📸 **Instagram**: Support for Reels, Posts, and IGTV clips.
+- 🎵 **Spotify**: Support for Tracks, Playlists, and Albums.
+- 🎼 **True 320kbps MP3**: Automatic high-quality audio extraction with embedded FFmpeg.
+- ⚡ **Live Download Tracking**: Real-time progress bar, download speed (MB/s), and ETA.
+- 🎨 **Modern Interface**: Glassmorphism UI design with dark mode and smooth animations.
 
 ---
 
