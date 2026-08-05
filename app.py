@@ -6,7 +6,7 @@ import shutil
 import urllib.parse
 import yt_dlp
 import requests
-from flask import Flask, request, jsonify, render_template, send_file, after_this_request, Response, stream_with_context
+from flask import Flask, request, jsonify, render_template, send_file, after_this_request, Response, stream_with_context, redirect
 from flask_cors import CORS
 from downloader import DownloadManager, _get_default_ydl_opts, FFMPEG_PATH
 
@@ -251,28 +251,7 @@ def proxy_download():
         if not stream_url:
             return jsonify({'error': 'Stream URL not available'}), 404
 
-        title = info.get('title') or 'media'
-        clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
-        ext = 'mp3' if format_type == 'audio' else 'mp4'
-        filename = f"{clean_title}.{ext}"
-
-        req = requests.get(stream_url, stream=True, headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        }, timeout=30)
-
-        def generate():
-            for chunk in req.iter_content(chunk_size=65536):
-                if chunk:
-                    yield chunk
-
-        headers = {
-            'Content-Disposition': f'attachment; filename="{filename}"',
-            'Content-Type': req.headers.get('Content-Type', 'application/octet-stream')
-        }
-        if req.headers.get('Content-Length'):
-            headers['Content-Length'] = req.headers.get('Content-Length')
-
-        return Response(stream_with_context(generate()), headers=headers)
+        return redirect(stream_url)
     except Exception as e:
         return jsonify({'error': clean_error_message(e)}), 400
 

@@ -158,13 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const button = e.currentTarget;
                 const encodedUrl = button.getAttribute('data-url');
                 const proxyUrl = `/api/download/proxy?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
-                
-                const a = document.createElement('a');
-                a.href = proxyUrl;
-                a.setAttribute('download', '');
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => document.body.removeChild(a), 1000);
+                window.open(proxyUrl, '_blank');
             });
         });
     }
