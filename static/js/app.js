@@ -204,6 +204,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedItems = playlistData.items.filter(item => selectedIds.includes(item.id));
 
         if (isCloudDeployment) {
+            overallCard.classList.add('active');
+            overallFill.style.width = '100%';
+            overallText.textContent = `Downloading ${selectedItems.length} item(s) directly to your browser...`;
+
             selectedItems.forEach((item, idx) => {
                 setTimeout(() => {
                     const dlUrl = `/api/download/stream?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
@@ -211,10 +215,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     iframe.style.display = 'none';
                     iframe.src = dlUrl;
                     document.body.appendChild(iframe);
-                    setTimeout(() => document.body.removeChild(iframe), 60000);
+                    setTimeout(() => document.body.removeChild(iframe), 120000);
                 }, idx * 1500);
             });
-            alert(`Started direct browser download for ${selectedItems.length} item(s)! Please check your browser downloads bar.`);
+
+            setTimeout(() => {
+                overallText.textContent = `Downloads initiated! Check your browser's download bar.`;
+                setTimeout(() => overallCard.classList.remove('active'), 6000);
+            }, 2000);
             return;
         }
 
