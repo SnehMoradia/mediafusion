@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         items.forEach((item, index) => {
             const durationFormatted = formatDuration(item.duration);
+            const redirectUrl = `/api/download/redirect?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
             const card = document.createElement('div');
             card.className = 'video-card';
             card.id = `video-card-${item.id}`;
@@ -123,10 +124,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="item-progress-section">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span class="badge badge-queued" id="badge-${item.id}">Queued</span>
-                        <button class="btn-secondary direct-dl-btn" data-url="${encodeURIComponent(item.url)}" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.3rem;">
-                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            Direct Download
-                        </button>
+                        <a href="${redirectUrl}" target="_blank" download class="btn-primary direct-dl-btn" data-url="${encodeURIComponent(item.url)}" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Download
+                        </a>
                     </div>
                     <div class="progress-bar-bg" style="margin-top: 0.5rem;">
                         <div class="progress-bar-fill" id="fill-${item.id}"></div>
@@ -144,28 +145,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.item-checkbox').forEach(cb => {
             cb.addEventListener('change', updateSelectAllState);
         });
+    }
 
-        // Add direct download click handlers
-        document.querySelectorAll('.direct-dl-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const button = e.currentTarget;
-                const encodedUrl = button.getAttribute('data-url');
-                button.disabled = true;
-                button.textContent = 'Extracting...';
-                try {
-                    const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
-                    const json = await res.json();
-                    if (!res.ok || json.error || !json.download_url) {
-                        throw new Error(json.error || 'Failed to extract stream link');
-                    }
-                    window.open(json.download_url, '_blank');
-                } catch (err) {
-                    alert(`Download Error: ${err.message}`);
-                } finally {
-                    button.disabled = false;
-                    button.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Direct Download`;
-                }
-            });
+    function updateDownloadLinks() {
+        document.querySelectorAll('.direct-dl-btn').forEach(a => {
+            const url = a.getAttribute('data-url');
+            if (url) {
+                a.href = `/api/download/redirect?url=${url}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
+            }
         });
     }
 
@@ -206,7 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <option value="360p">360p Low</option>
             `;
         }
+        updateDownloadLinks();
     });
+
+    qualitySelect.addEventListener('change', updateDownloadLinks);
 
     // Start Download
     startDownloadBtn.addEventListener('click', async () => {
@@ -220,23 +210,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isCloudDeployment) {
             overallCard.classList.add('active');
             overallFill.style.width = '100%';
-            overallText.textContent = `Extracting high-speed stream links for ${selectedItems.length} item(s)...`;
+            overallText.textContent = `Opening direct browser download for ${selectedItems.length} item(s)...`;
 
-            for (let idx = 0; idx < selectedItems.length; idx++) {
-                const item = selectedItems[idx];
-                try {
-                    const res = await fetch(`/api/download/direct?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
-                    const json = await res.json();
-                    if (json.success && json.download_url) {
-                        window.open(json.download_url, '_blank');
+            selectedIds.forEach((id, idx) => {
+                const card = document.getElementById(`video-card-${id}`);
+                if (card) {
+                    const dlBtn = card.querySelector('.direct-dl-btn');
+                    if (dlBtn) {
+                        setTimeout(() => dlBtn.click(), idx * 500);
                     }
-                } catch (err) {
-                    console.error('Cloud download error:', err);
                 }
-            }
+            });
 
-            overallText.textContent = `Stream links generated! Media is downloading in browser.`;
-            setTimeout(() => overallCard.classList.remove('active'), 5000);
+            setTimeout(() => {
+                overallText.textContent = `Downloads initiated! Check your browser downloads bar.`;
+                setTimeout(() => overallCard.classList.remove('active'), 5000);
+            }, 2000);
             return;
         }
 

@@ -114,6 +114,71 @@ def open_folder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/download/redirect', methods=['GET'])
+def redirect_download():
+    video_url = request.args.get('url', '').strip()
+    format_type = request.args.get('format', 'video').strip()
+    quality = request.args.get('quality', 'best').strip()
+
+    if not video_url:
+        return "URL is required", 400
+
+    try:
+        ydl_opts = _get_default_ydl_opts()
+        ydl_opts['skip_download'] = True
+        
+        if format_type == 'audio':
+            ydl_opts['format'] = '140/ba/bestaudio/best'
+        else:
+            if quality == '1080p':
+                ydl_opts['format'] = '22/bestvideo[height<=1080]+bestaudio/best'
+            elif quality == '720p':
+                ydl_opts['format'] = '22/bestvideo[height<=720]+bestaudio/18/best'
+            elif quality == '480p':
+                ydl_opts['format'] = '18/bestvideo[height<=480]+bestaudio/best'
+            elif quality == '360p':
+                ydl_opts['format'] = '18/best'
+            else:
+                ydl_opts['format'] = '22/18/best'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+
+        if not info:
+            return "Could not extract media stream", 400
+
+        stream_url = info.get('url')
+        if not stream_url and info.get('requested_formats'):
+            stream_url = info['requested_formats'][0].get('url')
+        if not stream_url and info.get('formats'):
+            for fmt in reversed(info['formats']):
+                if fmt.get('url') and (fmt.get('vcodec') != 'none' or format_type == 'audio'):
+                    stream_url = fmt['url']
+                    break
+            if not stream_url:
+                stream_url = info['formats'][-1].get('url')
+
+        if stream_url:
+            from flask import redirect
+            return redirect(stream_url)
+            
+        return "Stream URL not available", 404
+    except Exception as e:
+        match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
+        if match:
+            v_id = match.group(1)
+            try:
+                with yt_dlp.YoutubeDL(_get_default_ydl_opts()) as ydl:
+                    info = ydl.extract_info(f"ytsearch1:{v_id}", download=False)
+                    if info and info.get('entries'):
+                        stream_url = info['entries'][0].get('url')
+                        if stream_url:
+                            from flask import redirect
+                            return redirect(stream_url)
+            except Exception:
+                pass
+        return clean_error_message(e), 500
+
 @app.route('/api/download/direct', methods=['GET'])
 def get_direct_stream_url():
     video_url = request.args.get('url', '').strip()
