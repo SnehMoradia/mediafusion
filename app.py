@@ -51,13 +51,13 @@ def playlist_info():
     url = data.get('url', '').strip()
     
     if not url:
-        return jsonify({'error': 'Please provide a valid URL'}), 400
+        return jsonify({'success': False, 'error': 'Please provide a valid URL'}), 200
 
     try:
         info = dm.extract_info(url)
         return jsonify({'success': True, 'data': info})
     except Exception as e:
-        return jsonify({'error': clean_error_message(e)}), 400
+        return jsonify({'success': False, 'error': clean_error_message(e)}), 200
 
 @app.route('/api/download/start', methods=['POST'])
 def start_download():
@@ -211,7 +211,7 @@ def get_direct_stream_url():
     quality = request.args.get('quality', 'best').strip()
 
     if not video_url:
-        return jsonify({'error': 'URL parameter is required'}), 400
+        return jsonify({'success': False, 'error': 'URL parameter is required'}), 200
 
     try:
         stream_url, title = _get_media_stream_url(video_url, format_type, quality)
@@ -227,7 +227,7 @@ def get_direct_stream_url():
             'ext': ext
         })
     except Exception as e:
-        return jsonify({'error': clean_error_message(e)}), 400
+        return jsonify({'success': False, 'error': clean_error_message(e)}), 200
 
 @app.route('/api/download/proxy', methods=['GET'])
 def proxy_download():
