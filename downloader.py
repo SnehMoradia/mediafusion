@@ -21,6 +21,8 @@ def _get_ffmpeg_path():
 
 FFMPEG_PATH = _get_ffmpeg_path()
 
+COOKIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
+
 def _get_default_ydl_opts():
     opts = {
         'quiet': True,
@@ -36,6 +38,8 @@ def _get_default_ydl_opts():
             'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
         }
     }
+    if os.path.exists(COOKIES_PATH):
+        opts['cookiefile'] = COOKIES_PATH
     if shutil.which('node'):
         opts['js_runtimes'] = {'node': {}}
     return opts
