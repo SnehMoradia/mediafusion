@@ -28,12 +28,12 @@ def _get_default_ydl_opts():
         'nocolor': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios', 'mweb'],
-                'player_skip': ['web', 'web_music']
+                'player_client': ['android'],
+                'player_skip': ['web', 'web_music', 'mweb']
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
         }
     }
     if shutil.which('node'):

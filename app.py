@@ -121,17 +121,21 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
     def extract_stream_from_info(info):
         if not info:
             return None
-        stream_url = info.get('url')
-        if not stream_url and info.get('requested_formats'):
-            stream_url = info['requested_formats'][0].get('url')
-        if not stream_url and info.get('formats'):
+        if info.get('url') and 'googlevideo.com' in info.get('url'):
+            return info.get('url')
+        if info.get('requested_formats'):
+            for fmt in reversed(info['requested_formats']):
+                if fmt.get('url') and 'googlevideo.com' in fmt.get('url'):
+                    return fmt['url']
+        if info.get('formats'):
             for fmt in reversed(info['formats']):
-                if fmt.get('url') and (fmt.get('vcodec') != 'none' or format_type == 'audio'):
-                    stream_url = fmt['url']
-                    break
-            if not stream_url:
-                stream_url = info['formats'][-1].get('url')
-        return stream_url
+                if fmt.get('url') and 'googlevideo.com' in fmt.get('url'):
+                    if fmt.get('vcodec') != 'none' or format_type == 'audio':
+                        return fmt['url']
+            for fmt in reversed(info['formats']):
+                if fmt.get('url'):
+                    return fmt['url']
+        return info.get('url')
 
     primary_err = None
 
