@@ -19,6 +19,21 @@ def get_default_folder():
     default_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'PlaylistDownloads')
     return jsonify({'path': default_dir})
 
+import re
+
+def clean_error_message(e):
+    err_str = str(e)
+    clean_msg = re.sub(r'\x1b\[[0-9;]*[mGKS]', '', err_str).strip()
+    
+    if "Sign in to confirm you're not a bot" in clean_msg:
+        return "YouTube restricted access to this video. Please try a different public YouTube video or playlist link."
+    elif "Video unavailable" in clean_msg or "This video is unavailable" in clean_msg:
+        return "This video is unavailable or has been removed from YouTube."
+    elif clean_msg.startswith("ERROR: [youtube]"):
+        clean_msg = re.sub(r'^ERROR:\s*\[youtube\]\s*[\w-]+:\s*', '', clean_msg)
+    
+    return clean_msg
+
 @app.route('/api/playlist-info', methods=['POST'])
 def playlist_info():
     data = request.get_json() or {}
@@ -31,7 +46,7 @@ def playlist_info():
         info = dm.extract_info(url)
         return jsonify({'success': True, 'data': info})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': clean_error_message(e)}), 400
 
 @app.route('/api/download/start', methods=['POST'])
 def start_download():

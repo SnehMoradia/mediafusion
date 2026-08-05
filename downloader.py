@@ -21,6 +21,19 @@ def _get_ffmpeg_path():
 
 FFMPEG_PATH = _get_ffmpeg_path()
 
+def _get_default_ydl_opts():
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'nocolor': True,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        }
+    }
+    if shutil.which('node'):
+        opts['js_runtimes'] = {'node': {}}
+    return opts
+
 class DownloadManager:
     def __init__(self):
         self.jobs = {}  # job_id -> job_info dict
@@ -38,12 +51,9 @@ class DownloadManager:
 
     def _extract_youtube_info(self, url):
         """Extract metadata for a playlist or single video URL using yt-dlp."""
-        ydl_opts = {
-            'extract_flat': 'in_playlist',
-            'skip_download': True,
-            'quiet': True,
-            'no_warnings': True,
-        }
+        ydl_opts = _get_default_ydl_opts()
+        ydl_opts['extract_flat'] = 'in_playlist'
+        ydl_opts['skip_download'] = True
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -409,13 +419,12 @@ class DownloadManager:
         # Base output template
         out_tmpl = os.path.join(output_dir, '%(title)s [%(id)s].%(ext)s')
 
-        opts = {
+        opts = _get_default_ydl_opts()
+        opts.update({
             'outtmpl': out_tmpl,
             'progress_hooks': [progress_hook],
-            'quiet': True,
-            'no_warnings': True,
             'ignoreerrors': True,
-        }
+        })
 
         if FFMPEG_PATH:
             opts['ffmpeg_location'] = FFMPEG_PATH
