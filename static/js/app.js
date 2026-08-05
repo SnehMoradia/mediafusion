@@ -145,15 +145,47 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.item-checkbox').forEach(cb => {
             cb.addEventListener('change', updateSelectAllState);
         });
+
+        // Add direct download click handlers
+        document.querySelectorAll('.direct-dl-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const button = e.currentTarget;
+                const encodedUrl = button.getAttribute('data-url');
+                button.style.pointerEvents = 'none';
+                button.style.opacity = '0.7';
+                const originalText = button.innerHTML;
+                button.innerHTML = `Extracting...`;
+                
+                try {
+                    const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
+                    const json = await res.json();
+                    if (!res.ok || !json.download_url) {
+                        throw new Error(json.error || 'Failed to extract media stream');
+                    }
+                    
+                    const a = document.createElement('a');
+                    a.href = json.download_url;
+                    a.setAttribute('referrerpolicy', 'no-referrer');
+                    a.setAttribute('rel', 'noreferrer');
+                    a.setAttribute('target', '_blank');
+                    a.setAttribute('download', json.filename || 'media.mp4');
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => document.body.removeChild(a), 1000);
+                } catch (err) {
+                    alert(`Download Error: ${err.message}`);
+                } finally {
+                    button.style.pointerEvents = 'auto';
+                    button.style.opacity = '1';
+                    button.innerHTML = originalText;
+                }
+            });
+        });
     }
 
     function updateDownloadLinks() {
-        document.querySelectorAll('.direct-dl-btn').forEach(a => {
-            const url = a.getAttribute('data-url');
-            if (url) {
-                a.href = `/api/download/proxy?url=${url}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
-            }
-        });
+        // No-op for direct extraction
     }
 
     // Select all handler
