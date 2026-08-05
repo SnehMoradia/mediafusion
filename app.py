@@ -114,6 +114,77 @@ def open_folder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/download/direct', methods=['GET'])
+def get_direct_stream_url():
+    video_url = request.args.get('url', '').strip()
+    format_type = request.args.get('format', 'video').strip()
+    quality = request.args.get('quality', 'best').strip()
+
+    if not video_url:
+        return jsonify({'error': 'URL parameter is required'}), 400
+
+    try:
+        ydl_opts = _get_default_ydl_opts()
+        ydl_opts['skip_download'] = True
+        
+        if format_type == 'audio':
+            ydl_opts['format'] = 'bestaudio/best'
+        else:
+            if quality == '1080p':
+                ydl_opts['format'] = 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'
+            elif quality == '720p':
+                ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
+            elif quality == '480p':
+                ydl_opts['format'] = 'bestvideo[height<=480]+bestaudio/best[height<=480]/best'
+            elif quality == '360p':
+                ydl_opts['format'] = 'bestvideo[height<=360]+bestaudio/best[height<=360]/best'
+            else:
+                ydl_opts['format'] = 'bestvideo+bestaudio/best'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+
+        if not info:
+            return jsonify({'error': 'Could not extract media stream'}), 400
+
+        stream_url = info.get('url')
+        if not stream_url and info.get('requested_formats'):
+            stream_url = info['requested_formats'][0].get('url')
+        if not stream_url and info.get('formats'):
+            stream_url = info['formats'][-1].get('url')
+
+        if not stream_url:
+            return jsonify({'error': 'Stream URL not available'}), 404
+
+        title = info.get('title') or 'media'
+        ext = info.get('ext') or ('mp3' if format_type == 'audio' else 'mp4')
+
+        return jsonify({
+            'success': True,
+            'download_url': stream_url,
+            'title': title,
+            'ext': ext
+        })
+    except Exception as e:
+        match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
+        if match:
+            v_id = match.group(1)
+            try:
+                with yt_dlp.YoutubeDL(_get_default_ydl_opts()) as ydl:
+                    info = ydl.extract_info(f"ytsearch1:{v_id}", download=False)
+                    if info and info.get('entries'):
+                        entry = info['entries'][0]
+                        stream_url = entry.get('url')
+                        return jsonify({
+                            'success': True,
+                            'download_url': stream_url,
+                            'title': entry.get('title'),
+                            'ext': 'mp4'
+                        })
+            except Exception:
+                pass
+        return jsonify({'error': clean_error_message(e)}), 400
+
 @app.route('/api/download/stream', methods=['GET'])
 def stream_download():
     video_url = request.args.get('url', '').strip()

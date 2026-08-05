@@ -147,10 +147,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add direct download click handlers
         document.querySelectorAll('.direct-dl-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const encodedUrl = e.currentTarget.getAttribute('data-url');
-                const dlUrl = `/api/download/stream?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
-                window.open(dlUrl, '_blank');
+            btn.addEventListener('click', async (e) => {
+                const button = e.currentTarget;
+                const encodedUrl = button.getAttribute('data-url');
+                button.disabled = true;
+                button.textContent = 'Extracting...';
+                try {
+                    const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
+                    const json = await res.json();
+                    if (!res.ok || json.error || !json.download_url) {
+                        throw new Error(json.error || 'Failed to extract stream link');
+                    }
+                    window.open(json.download_url, '_blank');
+                } catch (err) {
+                    alert(`Download Error: ${err.message}`);
+                } finally {
+                    button.disabled = false;
+                    button.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Direct Download`;
+                }
             });
         });
     }
@@ -206,23 +220,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isCloudDeployment) {
             overallCard.classList.add('active');
             overallFill.style.width = '100%';
-            overallText.textContent = `Downloading ${selectedItems.length} item(s) directly to your browser...`;
+            overallText.textContent = `Extracting high-speed stream links for ${selectedItems.length} item(s)...`;
 
-            selectedItems.forEach((item, idx) => {
-                setTimeout(() => {
-                    const dlUrl = `/api/download/stream?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = dlUrl;
-                    document.body.appendChild(iframe);
-                    setTimeout(() => document.body.removeChild(iframe), 120000);
-                }, idx * 1500);
-            });
+            for (let idx = 0; idx < selectedItems.length; idx++) {
+                const item = selectedItems[idx];
+                try {
+                    const res = await fetch(`/api/download/direct?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`);
+                    const json = await res.json();
+                    if (json.success && json.download_url) {
+                        window.open(json.download_url, '_blank');
+                    }
+                } catch (err) {
+                    console.error('Cloud download error:', err);
+                }
+            }
 
-            setTimeout(() => {
-                overallText.textContent = `Downloads initiated! Check your browser's download bar.`;
-                setTimeout(() => overallCard.classList.remove('active'), 6000);
-            }, 2000);
+            overallText.textContent = `Stream links generated! Media is downloading in browser.`;
+            setTimeout(() => overallCard.classList.remove('active'), 5000);
             return;
         }
 
