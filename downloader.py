@@ -30,12 +30,11 @@ def _get_default_ydl_opts():
         'nocolor': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android'],
-                'player_skip': ['web', 'web_music', 'mweb']
+                'player_client': ['ios', 'mweb', 'android', 'tv']
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         }
     }
     if os.path.exists(COOKIES_PATH):
@@ -60,17 +59,30 @@ class DownloadManager:
             return self._extract_youtube_info(url)
 
     def _extract_youtube_info(self, url):
-        """Extract metadata for a playlist or single video URL using yt-dlp."""
-        ydl_opts = _get_default_ydl_opts()
-        ydl_opts['extract_flat'] = 'in_playlist'
-        ydl_opts['skip_download'] = True
-        
+        """Extract metadata for a playlist or single video URL using yt-dlp with fallback client strategies."""
         info = None
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-        except Exception as e:
-            err_msg = str(e)
+        client_configs = [
+            ['ios', 'mweb', 'android', 'tv'],
+            ['tv', 'mweb'],
+            ['web_creator', 'android']
+        ]
+
+        last_error = None
+        for clients in client_configs:
+            ydl_opts = _get_default_ydl_opts()
+            ydl_opts['extract_flat'] = 'in_playlist'
+            ydl_opts['skip_download'] = True
+            ydl_opts['extractor_args'] = {'youtube': {'player_client': clients}}
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                if info:
+                    break
+            except Exception as e:
+                last_error = e
+
+        if not info and last_error:
+            err_msg = str(last_error)
             if 'list=' not in url and ('Sign in to confirm' in err_msg or 'unavailable' in err_msg or 'ERROR' in err_msg):
                 match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', url)
                 if match:
@@ -85,7 +97,7 @@ class DownloadManager:
                             'total_items': 1,
                             'items': [search_item]
                         }
-            raise e
+            raise last_error
 
         if not info:
             raise ValueError("Could not fetch information for the provided URL.")
@@ -206,12 +218,11 @@ class DownloadManager:
 
     def _search_youtube_track(self, query, index=1):
         """Search YouTube for a Spotify track and return formatted item dict."""
-        ydl_opts = {
+        ydl_opts = _get_default_ydl_opts()
+        ydl_opts.update({
             'extract_flat': True,
             'skip_download': True,
-            'quiet': True,
-            'no_warnings': True,
-        }
+        })
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 res = ydl.extract_info(f"ytsearch1:{query}", download=False)

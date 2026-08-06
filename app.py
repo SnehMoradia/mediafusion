@@ -37,7 +37,7 @@ def clean_error_message(e):
     clean_msg = re.sub(r'\x1b\[[0-9;]*[mGKS]', '', err_str).strip()
     
     if "Sign in to confirm you're not a bot" in clean_msg:
-        return "YouTube restricted access to this video. Please try a different public YouTube video or playlist link."
+        return "YouTube restricted cloud access for this video (bot check). Please run the app locally on http://localhost:5050 or add a cookies.txt file."
     elif "Video unavailable" in clean_msg or "This video is unavailable" in clean_msg:
         return "This video is unavailable or has been removed from YouTube."
     elif clean_msg.startswith("ERROR: [youtube]"):
