@@ -1,67 +1,66 @@
-# 🎵 MediaFusion - Universal Media Downloader
+# MediaFusion - Production Media & Playlist Downloader
 
-<p align="center">
-  <img src="https://fav.farm/🎵" width="80" alt="MediaFusion Logo" />
-</p>
+A modern, scalable, full-stack application for downloading YouTube playlists, Spotify tracks, and Instagram reels.
 
-<p align="center">
-  <b>A fast, modern, multi-platform media downloader for YouTube, Instagram, and Spotify.</b><br>
-  Download playlists, videos, reels, and audio tracks in high-definition MP4 video or 320kbps MP3 audio.
-</p>
+## 🚀 Architecture Overview
 
----
-
-## 📖 User Guide (How to Use)
-
-### 🚀 1. Opening the App
-* Double-click the **`run.bat`** file on your computer.
-* Your web browser will open automatically to `http://localhost:5050`.
+- **Frontend**: Next.js 14, React 18, Tailwind CSS (Responsive dark glassmorphic UI)
+- **Backend**: FastAPI (Python 3.11), REST API & WebSockets
+- **Downloader Core**: `yt-dlp` with automated player client fallback strategies
+- **Async Queue**: Celery worker powered by Redis
+- **Reverse Proxy**: Nginx
+- **Orchestration**: Docker & Docker Compose
 
 ---
 
-### 🎥 2. Downloading YouTube Videos & Playlists
-1. Copy any **YouTube Video**, **Playlist**, **Shorts**, or **Channel** link from your browser or app.
-2. Paste the link into the search bar at the top of MediaFusion.
-3. Click **Fetch Media** to load the video list.
-4. Select your preferred format: **Video (MP4)** or **Audio (MP3)**.
-5. Select your quality preference (e.g. 1080p Full HD, 720p HD, 480p, 360p).
-6. Click **Start Download**.
+## 🛠️ Quick Start (Docker Compose)
+
+### Prerequisites
+- Docker Engine & Docker Compose installed on your host machine / VPS.
+
+### Steps
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/SnehMoradia/mediafusion.git
+   cd mediafusion
+   ```
+
+2. Launch all services:
+   ```bash
+   docker-compose up -d --build
+   ```
+
+3. Open your browser and navigate to:
+   - **App Interface**: `http://localhost` (or `http://your-vps-ip`)
+   - **Backend API Docs**: `http://localhost/api/docs`
 
 ---
 
-### 📸 3. Downloading Instagram Reels & Posts
-1. Copy the link of any **Instagram Reel**, **Video Post**, or **IGTV clip**.
-2. Paste the link into MediaFusion and click **Fetch Media**.
-3. Choose whether you want to save it as an **MP4 Video** or convert the audio to **MP3**.
-4. Click **Start Download**.
+## 💻 Local Development (Without Docker)
+
+### Backend Setup
+1. Navigate to `backend`:
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # or venv\Scripts\activate on Windows
+   pip install -r requirements.txt
+   ```
+2. Start FastAPI development server:
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+
+### Frontend Setup
+1. Navigate to `frontend`:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+2. Open `http://localhost:3000` in your browser.
 
 ---
 
-### 🎧 4. Downloading Spotify Tracks, Playlists & Albums
-1. Copy the link of any **Spotify Track**, **Playlist**, or **Album**.
-2. Paste the link into MediaFusion and click **Fetch Media**.
-3. MediaFusion automatically extracts track information and matches high-quality audio streams.
-4. Select **Audio (MP3)** and click **Start Download**.
-
----
-
-### 📂 5. Accessing Your Downloaded Files
-* All downloaded files are saved directly in your system's **Downloads/PlaylistDownloads** folder.
-* Click the **Open** button inside the app toolbar at any time to open your downloads folder directly in File Explorer.
-
----
-
-## ✨ Highlights & Features
-
-- 🎥 **YouTube**: Support for Playlists, Videos, Shorts, and Channels.
-- 📸 **Instagram**: Support for Reels, Posts, and IGTV clips.
-- 🎵 **Spotify**: Support for Tracks, Playlists, and Albums.
-- 🎼 **True 320kbps MP3**: Automatic high-quality audio extraction with embedded FFmpeg.
-- ⚡ **Live Download Tracking**: Real-time progress bar, download speed (MB/s), and ETA.
-- 🎨 **Modern Interface**: Glassmorphism UI design with dark mode and smooth animations.
-
----
-
-<p align="center">
-  Created with ❤️ by <b><a href="https://github.com/SnehMoradia">Sneh Moradia</a></b>
-</p>
+## 🔑 Custom Cookies Support
+If YouTube presents bot check errors ("Sign in to confirm you're not a bot"), click the **Custom Cookies** button in the top right header of the web interface and paste your exported `cookies.txt` content. Custom cookies are securely passed with your download request to bypass datacenter IP restrictions.
