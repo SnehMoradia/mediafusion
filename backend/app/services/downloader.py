@@ -57,19 +57,31 @@ def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
         opts['extractor_args']['youtube']['visitor_data'] = [visitor_data]
 
     writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
-    if cookie_file_path and os.path.exists(cookie_file_path):
-        opts['cookiefile'] = cookie_file_path
-    elif user_cookies and user_cookies.strip():
+    env_cookies = os.environ.get('YOUTUBE_COOKIES')
+
+    if user_cookies and user_cookies.strip():
         temp_cookie = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt')
         temp_cookie.write(user_cookies)
         temp_cookie.close()
         opts['cookiefile'] = temp_cookie.name
-    elif os.path.exists(GLOBAL_COOKIES_PATH):
+    elif env_cookies and env_cookies.strip():
         try:
-            shutil.copy(GLOBAL_COOKIES_PATH, writable_cookie_path)
+            with open(writable_cookie_path, 'w') as f:
+                f.write(env_cookies.strip())
             opts['cookiefile'] = writable_cookie_path
         except Exception:
-            opts['cookiefile'] = GLOBAL_COOKIES_PATH
+            pass
+    elif cookie_file_path and os.path.exists(cookie_file_path):
+        opts['cookiefile'] = cookie_file_path
+    elif os.path.exists(GLOBAL_COOKIES_PATH):
+        try:
+            with open(GLOBAL_COOKIES_PATH, 'r') as f:
+                content = f.read().strip()
+            if any(line and not line.startswith('#') for line in content.splitlines()):
+                shutil.copy(GLOBAL_COOKIES_PATH, writable_cookie_path)
+                opts['cookiefile'] = writable_cookie_path
+        except Exception:
+            pass
 
     if shutil.which('node'):
         opts['js_runtimes'] = {'node': {}}

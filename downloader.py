@@ -64,17 +64,20 @@ def _get_default_ydl_opts():
     env_cookies = os.environ.get('YOUTUBE_COOKIES')
     writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
 
-    if os.path.exists(COOKIES_PATH):
-        try:
-            shutil.copy(COOKIES_PATH, writable_cookie_path)
-            opts['cookiefile'] = writable_cookie_path
-        except Exception:
-            opts['cookiefile'] = COOKIES_PATH
-    elif env_cookies and env_cookies.strip():
+    if env_cookies and env_cookies.strip():
         try:
             with open(writable_cookie_path, 'w') as f:
-                f.write(env_cookies)
+                f.write(env_cookies.strip())
             opts['cookiefile'] = writable_cookie_path
+        except Exception:
+            pass
+    elif os.path.exists(COOKIES_PATH):
+        try:
+            with open(COOKIES_PATH, 'r') as f:
+                content = f.read().strip()
+            if any(line and not line.startswith('#') for line in content.splitlines()):
+                shutil.copy(COOKIES_PATH, writable_cookie_path)
+                opts['cookiefile'] = writable_cookie_path
         except Exception:
             pass
 
