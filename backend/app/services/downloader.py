@@ -110,7 +110,7 @@ class MediaDownloader:
                 match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', url)
                 if match:
                     video_id = match.group(1)
-                    search_item = self._search_youtube_track(f"https://www.youtube.com/watch?v={video_id}", user_cookies=user_cookies)
+                    search_item = self._search_youtube_track(video_id, user_cookies=user_cookies)
                     if search_item:
                         return {
                             'is_playlist': False,
