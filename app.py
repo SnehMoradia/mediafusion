@@ -137,7 +137,11 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
                     return fmt['url']
         return info.get('url')
 
-    fmt_opt = '140/ba/b/bestaudio/best' if format_type == 'audio' else '18/22/b/best'
+    if format_type == 'audio':
+        fmt_opts = ['140/ba/b/bestaudio/best', 'ba/b/bestaudio', 'bestaudio', None]
+    else:
+        fmt_opts = ['b/best/bestvideo+bestaudio/18/22', '18/22/b/best', 'best', None]
+
     primary_err = None
 
     client_strategies = [
@@ -146,48 +150,52 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
         ['web_creator', 'android']
     ]
 
-    for clients in client_strategies:
-        try:
-            ydl_opts = _get_default_ydl_opts()
-            ydl_opts['skip_download'] = True
-            ydl_opts['format'] = fmt_opt
-            ydl_opts['extractor_args'] = {
-                'youtube': {
-                    'player_client': clients
+    for fmt in fmt_opts:
+        for clients in client_strategies:
+            try:
+                ydl_opts = _get_default_ydl_opts()
+                ydl_opts['skip_download'] = True
+                if fmt:
+                    ydl_opts['format'] = fmt
+                ydl_opts['extractor_args'] = {
+                    'youtube': {
+                        'player_client': clients
+                    }
                 }
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(video_url, download=False)
-                url = extract_stream_from_info(info)
-                if url:
-                    title = info.get('title') or 'media'
-                    return url, title
-        except Exception as e:
-            if not primary_err:
-                primary_err = e
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(video_url, download=False)
+                    url = extract_stream_from_info(info)
+                    if url:
+                        title = info.get('title') or 'media'
+                        return url, title
+            except Exception as e:
+                if not primary_err:
+                    primary_err = e
 
     # Strategy: Direct video ID search lookup fallback
     match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
     if match:
         v_id = match.group(1)
-        for clients in client_strategies:
-            try:
-                search_opts = _get_default_ydl_opts()
-                search_opts['skip_download'] = True
-                search_opts['format'] = fmt_opt
-                search_opts['extractor_args'] = {
-                    'youtube': {
-                        'player_client': clients
+        for fmt in fmt_opts:
+            for clients in client_strategies:
+                try:
+                    search_opts = _get_default_ydl_opts()
+                    search_opts['skip_download'] = True
+                    if fmt:
+                        search_opts['format'] = fmt
+                    search_opts['extractor_args'] = {
+                        'youtube': {
+                            'player_client': clients
+                        }
                     }
-                }
-                with yt_dlp.YoutubeDL(search_opts) as ydl:
-                    info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
-                    url = extract_stream_from_info(info)
-                    if url:
-                        title = info.get('title') or 'media'
-                        return url, title
-            except Exception:
-                pass
+                    with yt_dlp.YoutubeDL(search_opts) as ydl:
+                        info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
+                        url = extract_stream_from_info(info)
+                        if url:
+                            title = info.get('title') or 'media'
+                            return url, title
+                except Exception:
+                    pass
 
     raise primary_err or ValueError("Could not extract media stream")
 
