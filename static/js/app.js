@@ -71,6 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ url })
             });
 
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                throw new Error('Python server is not running on this port. Please open http://localhost:5050 in your browser.');
+            }
+
             const json = await res.json();
             if (!res.ok || json.error) {
                 throw new Error(json.error || 'Failed to extract playlist info');
