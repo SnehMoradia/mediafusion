@@ -240,7 +240,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error('Stream URL not available');
                 }
             } catch (err) {
-                alert(`Download Error: ${err.message}`);
+                console.warn(`Stream extraction error: ${err.message}`);
+                const rawUrl = decodeURIComponent(encodedUrl);
+                window.open(rawUrl, '_blank');
             } finally {
                 button.style.pointerEvents = 'auto';
                 button.style.opacity = '1';
