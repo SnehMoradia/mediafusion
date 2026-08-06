@@ -5,6 +5,7 @@ import threading
 import shutil
 import re
 import json
+import tempfile
 import requests
 import yt_dlp
 
@@ -37,8 +38,15 @@ def _get_default_ydl_opts():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         }
     }
+    env_cookies = os.environ.get('YOUTUBE_COOKIES')
     if os.path.exists(COOKIES_PATH):
         opts['cookiefile'] = COOKIES_PATH
+    elif env_cookies and env_cookies.strip():
+        temp_cookie = os.path.join(tempfile.gettempdir(), 'yt_cookies.txt')
+        with open(temp_cookie, 'w') as f:
+            f.write(env_cookies)
+        opts['cookiefile'] = temp_cookie
+
     if shutil.which('node'):
         opts['js_runtimes'] = {'node': {}}
     return opts
