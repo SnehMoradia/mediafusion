@@ -56,6 +56,7 @@ def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
     if visitor_data:
         opts['extractor_args']['youtube']['visitor_data'] = [visitor_data]
 
+    writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
     if cookie_file_path and os.path.exists(cookie_file_path):
         opts['cookiefile'] = cookie_file_path
     elif user_cookies and user_cookies.strip():
@@ -64,7 +65,11 @@ def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
         temp_cookie.close()
         opts['cookiefile'] = temp_cookie.name
     elif os.path.exists(GLOBAL_COOKIES_PATH):
-        opts['cookiefile'] = GLOBAL_COOKIES_PATH
+        try:
+            shutil.copy(GLOBAL_COOKIES_PATH, writable_cookie_path)
+            opts['cookiefile'] = writable_cookie_path
+        except Exception:
+            opts['cookiefile'] = GLOBAL_COOKIES_PATH
 
     if shutil.which('node'):
         opts['js_runtimes'] = {'node': {}}
