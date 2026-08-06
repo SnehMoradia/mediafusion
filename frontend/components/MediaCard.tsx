@@ -95,6 +95,15 @@ export default function MediaCard({ data, selectedIds, onToggleSelect, onToggleS
                 <p className="text-sm font-medium text-gray-200 truncate">{item.title}</p>
                 <p className="text-xs text-gray-500">{item.uploader} • {formatDuration(item.duration)}</p>
               </div>
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 text-xs font-semibold rounded-lg border border-indigo-500/30 transition flex items-center space-x-1"
+              >
+                <span>Watch / Source</span>
+              </a>
             </div>
           )
         })}
