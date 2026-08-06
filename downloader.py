@@ -24,6 +24,24 @@ FFMPEG_PATH = _get_ffmpeg_path()
 
 COOKIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
 
+def fetch_youtube_visitor_data():
+    """Dynamically fetch YouTube visitor_data from YouTube embed to bypass datacenter IP restrictions."""
+    try:
+        r = requests.get(
+            'https://www.youtube.com/embed/',
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9'
+            },
+            timeout=5
+        )
+        match = re.search(r'VISITOR_DATA[\":\s]+([A-Za-z0-9_-]{20,})', r.text)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return None
+
 def _get_default_ydl_opts():
     opts = {
         'quiet': True,
@@ -31,13 +49,18 @@ def _get_default_ydl_opts():
         'nocolor': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'mweb', 'android', 'tv']
+                'player_client': ['web_creator', 'ios', 'mweb', 'android', 'tv'],
             }
         },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         }
     }
+    
+    visitor_data = fetch_youtube_visitor_data()
+    if visitor_data:
+        opts['extractor_args']['youtube']['visitor_data'] = [visitor_data]
+
     env_cookies = os.environ.get('YOUTUBE_COOKIES')
     if os.path.exists(COOKIES_PATH):
         opts['cookiefile'] = COOKIES_PATH

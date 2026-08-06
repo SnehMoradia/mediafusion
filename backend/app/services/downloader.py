@@ -20,6 +20,23 @@ def get_ffmpeg_path():
 FFMPEG_PATH = get_ffmpeg_path()
 GLOBAL_COOKIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'cookies.txt')
 
+def fetch_youtube_visitor_data():
+    try:
+        r = requests.get(
+            'https://www.youtube.com/embed/',
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9'
+            },
+            timeout=5
+        )
+        match = re.search(r'VISITOR_DATA[\":\s]+([A-Za-z0-9_-]{20,})', r.text)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return None
+
 def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
     opts = {
         'quiet': True,
@@ -27,7 +44,7 @@ def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
         'nocolor': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'mweb', 'android', 'tv']
+                'player_client': ['web_creator', 'ios', 'mweb', 'android', 'tv']
             }
         },
         'http_headers': {
@@ -35,6 +52,10 @@ def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
         }
     }
     
+    visitor_data = fetch_youtube_visitor_data()
+    if visitor_data:
+        opts['extractor_args']['youtube']['visitor_data'] = [visitor_data]
+
     if cookie_file_path and os.path.exists(cookie_file_path):
         opts['cookiefile'] = cookie_file_path
     elif user_cookies and user_cookies.strip():
