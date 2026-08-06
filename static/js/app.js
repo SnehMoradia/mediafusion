@@ -240,9 +240,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error('Stream URL not available');
                 }
             } catch (err) {
-                console.warn(`Stream extraction error: ${err.message}`);
-                const rawUrl = decodeURIComponent(encodedUrl);
-                window.open(rawUrl, '_blank');
+                console.warn(`Stream extraction fallback: ${err.message}`);
+                const fallbackUrl = `/api/download/proxy?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
+                window.location.href = fallbackUrl;
             } finally {
                 button.style.pointerEvents = 'auto';
                 button.style.opacity = '1';

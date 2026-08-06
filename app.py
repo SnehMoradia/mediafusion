@@ -226,8 +226,26 @@ def proxy_download():
         return jsonify({'error': 'URL parameter is required'}), 400
 
     try:
-        stream_url, _ = _get_media_stream_url(video_url, format_type, quality)
-        return redirect(stream_url)
+        stream_url, title = _get_media_stream_url(video_url, format_type, quality)
+        clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
+        ext = 'mp3' if format_type == 'audio' else 'mp4'
+        filename = f"{clean_title}.{ext}"
+
+        r = requests.get(stream_url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=20)
+
+        def generate():
+            for chunk in r.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+
+        headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Type': 'application/octet-stream',
+        }
+        if 'Content-Length' in r.headers:
+            headers['Content-Length'] = r.headers['Content-Length']
+
+        return Response(stream_with_context(generate()), headers=headers)
     except Exception as e:
         return jsonify({'error': clean_error_message(e)}), 400
 
