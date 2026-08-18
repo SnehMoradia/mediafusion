@@ -40,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let pollInterval = null;
 
     let isCloudDeployment = false;
-
     let defaultOutputDir = '';
 
     function getBase64Cookie() {
@@ -128,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json', ...getCookieHeaders() },
                     body: JSON.stringify({ cookies: val })
                 });
-                const data = await res.json();
+                await res.json();
                 alert('Cookies saved successfully! Cloud bot check is now bypassed.');
                 if (cookieModal) cookieModal.style.display = 'none';
             } catch (err) {
@@ -232,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         items.forEach((item, index) => {
             const durationFormatted = formatDuration(item.duration);
-            const redirectUrl = `/api/download/proxy?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
             const card = document.createElement('div');
             card.className = 'video-card';
             card.id = `video-card-${item.id}`;
@@ -248,17 +246,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="item-progress-section">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span class="badge badge-queued" id="badge-${item.id}">Queued</span>
-                        <a href="${redirectUrl}" target="_blank" download class="btn-primary direct-dl-btn" data-url="${encodeURIComponent(item.url)}" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+                        <span class="badge badge-queued" id="badge-${item.id}">Ready</span>
+                        <button type="button" class="btn-primary direct-dl-btn" data-id="${item.id}" data-url="${encodeURIComponent(item.url)}" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.35rem;">
                             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            Download
-                        </a>
+                            <span>Download</span>
+                        </button>
                     </div>
                     <div class="progress-bar-bg" style="margin-top: 0.5rem;">
                         <div class="progress-bar-fill" id="fill-${item.id}"></div>
                     </div>
                     <div class="progress-meta">
                         <span id="percent-${item.id}">0%</span>
+                        <span id="speed-${item.id}">-</span>
                         <span id="eta-${item.id}">-</span>
                     </div>
                 </div>
@@ -266,118 +265,63 @@ document.addEventListener('DOMContentLoaded', () => {
             videosContainer.appendChild(card);
         });
 
-        // Add event listeners to individual checkboxes
+        // Checkbox events
         document.querySelectorAll('.item-checkbox').forEach(cb => {
             cb.addEventListener('change', updateSelectAllState);
         });
 
-    // Client-side Blob download helper (forces local download in browser)
-    async function triggerClientSideDownload(streamUrl, filename, onProgress) {
-        try {
-            const response = await fetch(streamUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const contentLength = +response.headers.get('Content-Length') || 0;
-            const reader = response.body.getReader();
-            const chunks = [];
-            let receivedBytes = 0;
+        // Individual item download button handlers
+        document.querySelectorAll('.direct-dl-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const itemId = btn.getAttribute('data-id');
+                const encodedUrl = btn.getAttribute('data-url');
+                const item = playlistData ? playlistData.items.find(i => i.id === itemId) : null;
+                
+                if (!item) return;
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
-                receivedBytes += value.length;
-
-                if (contentLength > 0 && onProgress) {
-                    const percent = Math.round((receivedBytes / contentLength) * 100);
-                    onProgress(percent);
-                }
-            }
-
-            const blob = new Blob(chunks, { type: 'application/octet-stream' });
-            const blobUrl = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = filename || 'download.mp4';
-            document.body.appendChild(a);
-            a.click();
-
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
-            }, 1000);
-        } catch (err) {
-            // Fallback for CORS or stream limits: use direct link download trigger
-            const a = document.createElement('a');
-            a.href = streamUrl;
-            a.target = '_blank';
-            a.setAttribute('download', filename || 'download.mp4');
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => document.body.removeChild(a), 1000);
-        }
-    }
-
-    // Add direct download click handlers
-    document.querySelectorAll('.direct-dl-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const button = e.currentTarget;
-            const encodedUrl = button.getAttribute('data-url');
-            const itemCardId = button.closest('.video-card')?.id;
-            const itemId = itemCardId ? itemCardId.replace('video-card-', '') : null;
-            const originalText = button.innerHTML;
-
-            button.style.pointerEvents = 'none';
-            button.style.opacity = '0.7';
-            button.innerHTML = `Preparing...`;
-
-            try {
-                const res = await fetch(`/api/download/direct?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}${getCookieParam()}`, {
-                    headers: { ...getCookieHeaders() }
-                });
-                const json = await res.json();
-
-                if (!res.ok || json.error) {
-                    throw new Error(json.error || 'Failed to extract media stream');
+                if (isCloudDeployment) {
+                    // In cloud mode, stream converted file directly as browser attachment
+                    const streamUrl = `/api/download/stream?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}${getCookieParam()}`;
+                    window.location.href = streamUrl;
+                    return;
                 }
 
-                if (json.download_url) {
-                    button.innerHTML = `Downloading...`;
-                    await triggerClientSideDownload(json.download_url, json.filename, (percent) => {
-                        if (itemId) {
-                            const fill = document.getElementById(`fill-${itemId}`);
-                            const percentEl = document.getElementById(`percent-${itemId}`);
-                            if (fill) fill.style.width = `${percent}%`;
-                            if (percentEl) percentEl.textContent = `${percent}%`;
-                        }
+                // In local mode, execute high-speed local download job for this single item
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = `<span>Starting...</span>`;
+
+                try {
+                    const downloadPayload = {
+                        items: [item],
+                        format: formatSelect.value,
+                        quality: qualitySelect.value,
+                        output_dir: outputFolderInput ? outputFolderInput.value.trim() : defaultOutputDir
+                    };
+
+                    const res = await fetch('/api/download/start', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            ...getCookieHeaders()
+                        },
+                        body: JSON.stringify(downloadPayload)
                     });
-                } else {
-                    throw new Error('Stream URL not available');
-                }
-            } catch (err) {
-                console.warn(`Stream extraction fallback: ${err.message}`);
-                if (err.message && (err.message.toLowerCase().includes('bot') || err.message.toLowerCase().includes('cookie') || err.message.toLowerCase().includes('restricted'))) {
-                    if (cookieModal) cookieModal.style.display = 'flex';
-                    alert(err.message);
-                } else {
-                    const storedCookies = localStorage.getItem('youtube_cookies') || '';
-                    const cookieParam = storedCookies ? `&cookies=${encodeURIComponent(storedCookies)}` : '';
-                    const fallbackUrl = `/api/download/proxy?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}${cookieParam}`;
-                    window.location.href = fallbackUrl;
-                }
-            } finally {
-                button.style.pointerEvents = 'auto';
-                button.style.opacity = '1';
-                button.innerHTML = originalText;
-            }
-        });
-    });
-}
 
-    function updateDownloadLinks() {
-        // No-op for direct extraction
+                    const json = await res.json();
+                    if (!res.ok || json.error) throw new Error(json.error || 'Failed to start download');
+
+                    activeJobId = json.job_id;
+                    overallCard.classList.add('active');
+                    startPollingProgress();
+                } catch (err) {
+                    alert(`Download error: ${err.message}`);
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            });
+        });
     }
 
     // Select all handler
@@ -399,7 +343,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path })
-            });
+            }).then(r => r.json()).then(data => {
+                if (data.error) alert('Could not open folder: ' + data.error);
+            }).catch(console.error);
         });
     }
 
@@ -419,12 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <option value="360p">360p Low</option>
             `;
         }
-        updateDownloadLinks();
     });
 
-    qualitySelect.addEventListener('change', updateDownloadLinks);
-
-    // Start Download
+    // Start Download (Batch)
     startDownloadBtn.addEventListener('click', async () => {
         if (!playlistData || !playlistData.items) return;
 
@@ -436,22 +379,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isCloudDeployment) {
             overallCard.classList.add('active');
             overallFill.style.width = '100%';
-            overallText.textContent = `Opening direct browser download for ${selectedItems.length} item(s)...`;
+            overallText.textContent = `Opening browser download for ${selectedItems.length} item(s)...`;
 
-            selectedIds.forEach((id, idx) => {
-                const card = document.getElementById(`video-card-${id}`);
-                if (card) {
-                    const dlBtn = card.querySelector('.direct-dl-btn');
-                    if (dlBtn) {
-                        setTimeout(() => dlBtn.click(), idx * 500);
-                    }
-                }
+            selectedItems.forEach((item, idx) => {
+                setTimeout(() => {
+                    const streamUrl = `/api/download/stream?url=${encodeURIComponent(item.url)}&format=${formatSelect.value}&quality=${qualitySelect.value}${getCookieParam()}`;
+                    const a = document.createElement('a');
+                    a.href = streamUrl;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => document.body.removeChild(a), 1000);
+                }, idx * 1000);
             });
 
             setTimeout(() => {
-                overallText.textContent = `Downloads initiated! Check your browser downloads bar.`;
+                overallText.textContent = `Downloads initiated! Check your browser downloads.`;
                 setTimeout(() => overallCard.classList.remove('active'), 5000);
-            }, 2000);
+            }, 2500);
             return;
         }
 
@@ -468,7 +413,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const res = await fetch('/api/download/start', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...getCookieHeaders()
+                },
                 body: JSON.stringify(downloadPayload)
             });
 
@@ -505,17 +453,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     clearInterval(pollInterval);
                     pollInterval = null;
                     startDownloadBtn.disabled = false;
-                    startDownloadBtn.innerHTML = `Start Download`;
+                    startDownloadBtn.innerHTML = `
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Start Download
+                    `;
                     
                     if (job.status === 'completed') {
-                        overallText.textContent = `Completed ${job.completed_items} of ${job.total_items} downloads!`;
+                        overallText.textContent = `Completed ${job.completed_items} of ${job.total_items} items! Saved to folder.`;
                         setTimeout(() => overallCard.classList.remove('active'), 5000);
                     }
                 }
             } catch (err) {
                 console.error('Polling error:', err);
             }
-        }, 600);
+        }, 500);
     }
 
     function updateProgressUI(job) {
@@ -525,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const overallPercent = total > 0 ? Math.round((finished / total) * 100) : 0;
 
         overallFill.style.width = `${overallPercent}%`;
-        overallText.textContent = `Downloading ${finished} / ${total} items (${overallPercent}%)`;
+        overallText.textContent = `Downloaded ${finished} / ${total} items (${overallPercent}%)`;
 
         // Update items
         Object.values(job.items_status).forEach(item => {
@@ -534,15 +485,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const badge = document.getElementById(`badge-${item.id}`);
             const speed = document.getElementById(`speed-${item.id}`);
             const eta = document.getElementById(`eta-${item.id}`);
+            const card = document.getElementById(`video-card-${item.id}`);
+            const btn = card ? card.querySelector('.direct-dl-btn') : null;
 
             if (fill) fill.style.width = `${item.progress}%`;
             if (percent) percent.textContent = `${item.progress}%`;
             if (speed) speed.textContent = item.speed || '-';
-            if (eta) eta.textContent = item.eta ? `ETA: ${item.eta}` : '-';
+            if (eta) eta.textContent = item.eta ? `${item.eta}` : '-';
 
             if (badge) {
                 badge.className = `badge badge-${item.status}`;
                 badge.textContent = item.status.toUpperCase();
+            }
+
+            if (btn) {
+                if (item.status === 'finished') {
+                    btn.disabled = false;
+                    btn.style.background = 'rgba(16, 185, 129, 0.2)';
+                    btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                    btn.innerHTML = `<span>Saved</span>`;
+                } else if (item.status === 'downloading' || item.status === 'converting') {
+                    btn.disabled = true;
+                    btn.innerHTML = `<span>${item.status === 'converting' ? 'Converting...' : 'Downloading...'}</span>`;
+                }
             }
         });
     }
@@ -555,7 +520,10 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(pollInterval);
         overallCard.classList.remove('active');
         startDownloadBtn.disabled = false;
-        startDownloadBtn.innerHTML = `Start Download`;
+        startDownloadBtn.innerHTML = `
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Start Download
+        `;
     });
 
     // Helper

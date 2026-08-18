@@ -118,7 +118,8 @@ def start_download():
         output_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'PlaylistDownloads')
 
     try:
-        job_id, final_output_dir = dm.start_download_job(items, format_type, quality, output_dir)
+        user_cookies = get_request_cookies()
+        job_id, final_output_dir = dm.start_download_job(items, format_type, quality, output_dir, user_cookies=user_cookies)
         return jsonify({
             'success': True,
             'job_id': job_id,
@@ -314,6 +315,7 @@ def stream_download():
     video_url = request.args.get('url', '').strip()
     format_type = request.args.get('format', 'audio')
     quality = request.args.get('quality', 'best')
+    user_cookies = get_request_cookies()
 
     if not video_url:
         return jsonify({'error': 'URL is required'}), 400
@@ -321,7 +323,7 @@ def stream_download():
     temp_dir = tempfile.mkdtemp()
     
     try:
-        ydl_opts = _get_default_ydl_opts()
+        ydl_opts = _get_default_ydl_opts(user_cookies=user_cookies)
         out_tmpl = os.path.join(temp_dir, '%(title)s [%(id)s].%(ext)s')
         ydl_opts['outtmpl'] = out_tmpl
 

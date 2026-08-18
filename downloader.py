@@ -507,7 +507,7 @@ class DownloadManager:
         else:
             raise ValueError("Unsupported Spotify URL.")
 
-    def start_download_job(self, items, format_type='video', quality='best', output_dir=None):
+    def start_download_job(self, items, format_type='video', quality='best', output_dir=None, user_cookies=None):
         """Start downloading selected items in a background thread."""
         if not output_dir:
             output_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'PlaylistDownloads')
@@ -525,6 +525,7 @@ class DownloadManager:
             'output_dir': output_dir,
             'format_type': format_type,
             'quality': quality,
+            'user_cookies': user_cookies,
             'cancelled': False,
             'items_status': {
                 item['id']: {
@@ -557,6 +558,7 @@ class DownloadManager:
         format_type = job['format_type']
         quality = job['quality']
         output_dir = job['output_dir']
+        user_cookies = job.get('user_cookies')
 
         for item in items:
             if job['cancelled']:
@@ -569,16 +571,22 @@ class DownloadManager:
             item_state['status'] = 'downloading'
 
             # Construct yt-dlp format options
-            ydl_opts = self._build_yt_dlp_opts(format_type, quality, output_dir, job_id, video_id)
+            ydl_opts = self._build_yt_dlp_opts(format_type, quality, output_dir, job_id, video_id, user_cookies=user_cookies)
 
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([video_url])
+                    ret = ydl.download([video_url])
 
-                if not job['cancelled'] and item_state['status'] != 'error':
+                if not job['cancelled'] and item_state['status'] != 'error' and ret == 0:
                     item_state['status'] = 'finished'
                     item_state['progress'] = 100
+                    item_state['speed'] = 'Done'
+                    item_state['eta'] = 'Saved'
                     job['completed_items'] += 1
+                elif ret != 0 and item_state['status'] != 'finished':
+                    item_state['status'] = 'error'
+                    item_state['error'] = 'Download failed'
+                    job['failed_items'] += 1
             except Exception as e:
                 item_state['status'] = 'error'
                 item_state['error'] = str(e)
@@ -587,7 +595,7 @@ class DownloadManager:
         if not job['cancelled']:
             job['status'] = 'completed'
 
-    def _build_yt_dlp_opts(self, format_type, quality, output_dir, job_id, video_id):
+    def _build_yt_dlp_opts(self, format_type, quality, output_dir, job_id, video_id, user_cookies=None):
         # Progress hook function
         def progress_hook(d):
             job = self.jobs.get(job_id)
@@ -632,15 +640,35 @@ class DownloadManager:
             elif status == 'finished':
                 item_state['status'] = 'converting'
                 item_state['progress'] = 99.9
-                item_state['speed'] = 'Processing...'
+                item_state['speed'] = 'Converting to MP3...' if format_type == 'audio' else 'Merging...'
+                item_state['eta'] = 'Processing'
+
+        def postprocessor_hook(d):
+            job = self.jobs.get(job_id)
+            if not job:
+                return
+            item_state = job['items_status'].get(video_id)
+            if not item_state:
+                return
+            status = d.get('status')
+            if status == 'started':
+                item_state['status'] = 'converting'
+                item_state['speed'] = 'Encoding audio...' if format_type == 'audio' else 'Merging...'
+                item_state['eta'] = 'Processing'
+            elif status == 'finished':
+                item_state['status'] = 'finished'
+                item_state['progress'] = 100
+                item_state['speed'] = 'Complete'
+                item_state['eta'] = 'Saved'
 
         # Base output template
         out_tmpl = os.path.join(output_dir, '%(title)s [%(id)s].%(ext)s')
 
-        opts = _get_default_ydl_opts()
+        opts = _get_default_ydl_opts(user_cookies=user_cookies)
         opts.update({
             'outtmpl': out_tmpl,
             'progress_hooks': [progress_hook],
+            'postprocessor_hooks': [postprocessor_hook],
             'ignoreerrors': True,
         })
 
