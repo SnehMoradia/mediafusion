@@ -204,9 +204,10 @@ def _get_media_stream_url(video_url, format_type='video', quality='best', user_c
     primary_err = None
 
     client_strategies = [
+        ['web'],
+        ['tv_embedded'],
+        ['mweb'],
         ['android', 'ios'],
-        ['ios', 'mweb', 'android', 'tv'],
-        ['tv_embedded', 'mweb'],
         ['web_creator', 'android'],
         None
     ]

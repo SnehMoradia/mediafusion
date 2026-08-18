@@ -195,9 +195,10 @@ def _get_default_ydl_opts(user_cookies=None):
         'quiet': True,
         'no_warnings': True,
         'nocolor': True,
+        'remote_components': ['ejs:github'],
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios', 'tv_embedded', 'mweb', 'web_creator'],
+                'player_client': ['web', 'tv_embedded', 'mweb', 'android', 'ios', 'web_creator'],
             }
         },
         'http_headers': {
@@ -215,6 +216,8 @@ def _get_default_ydl_opts(user_cookies=None):
 
     if shutil.which('node'):
         opts['js_runtimes'] = {'node': {}}
+    elif shutil.which('deno'):
+        opts['js_runtimes'] = {'deno': {}}
     return opts
 
 class DownloadManager:
