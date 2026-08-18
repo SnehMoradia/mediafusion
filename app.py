@@ -144,26 +144,43 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
     def extract_stream_from_info(info):
         if not info:
             return None
-        if info.get('url') and 'googlevideo.com' in info.get('url'):
+        formats = info.get('formats', [])
+        if not formats:
             return info.get('url')
-        if info.get('requested_formats'):
-            for fmt in reversed(info['requested_formats']):
-                if fmt.get('url') and 'googlevideo.com' in fmt.get('url'):
-                    return fmt['url']
-        if info.get('formats'):
-            for fmt in reversed(info['formats']):
-                if fmt.get('url') and 'googlevideo.com' in fmt.get('url'):
-                    if fmt.get('vcodec') != 'none' or format_type == 'audio':
-                        return fmt['url']
-            for fmt in reversed(info['formats']):
-                if fmt.get('url'):
-                    return fmt['url']
-        return info.get('url')
 
-    if format_type == 'audio':
-        fmt_opts = ['140/ba/b/bestaudio/best', 'ba/b/bestaudio', 'bestaudio', None]
-    else:
-        fmt_opts = ['b/best/bestvideo+bestaudio/18/22', '18/22/b/best', 'best', None]
+        valid_formats = [f for f in formats if f.get('url') and f.get('url').startswith('http')]
+
+        if format_type == 'audio':
+            audio_formats = [f for f in valid_formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
+            if audio_formats:
+                audio_formats.sort(key=lambda x: x.get('abr') or x.get('tbr') or 0, reverse=True)
+                return audio_formats[0].get('url')
+            for f in reversed(valid_formats):
+                if f.get('acodec') != 'none':
+                    return f.get('url')
+        else:
+            muxed_formats = [f for f in valid_formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']
+            target_height = None
+            if quality == '1080p': target_height = 1080
+            elif quality == '720p': target_height = 720
+            elif quality == '480p': target_height = 480
+            elif quality == '360p': target_height = 360
+
+            if muxed_formats:
+                if target_height:
+                    matching = [f for f in muxed_formats if (f.get('height') or 0) <= target_height]
+                    if matching:
+                        matching.sort(key=lambda x: (x.get('height') or 0, x.get('tbr') or 0), reverse=True)
+                        return matching[0].get('url')
+                muxed_formats.sort(key=lambda x: (x.get('height') or 0, x.get('tbr') or 0), reverse=True)
+                return muxed_formats[0].get('url')
+
+            video_formats = [f for f in valid_formats if f.get('vcodec') != 'none']
+            if video_formats:
+                video_formats.sort(key=lambda x: (x.get('height') or 0, x.get('tbr') or 0), reverse=True)
+                return video_formats[0].get('url')
+
+        return info.get('url') or (valid_formats[-1].get('url') if valid_formats else None)
 
     primary_err = None
 
@@ -171,47 +188,44 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
         ['android', 'ios'],
         ['ios', 'mweb', 'android', 'tv'],
         ['tv_embedded', 'mweb'],
-        ['web_creator', 'android']
+        ['web_creator', 'android'],
+        None
     ]
 
-    for fmt in fmt_opts:
-        for clients in client_strategies:
-            try:
-                ydl_opts = _get_default_ydl_opts()
-                ydl_opts['skip_download'] = True
-                if fmt:
-                    ydl_opts['format'] = fmt
+    for clients in client_strategies:
+        try:
+            ydl_opts = _get_default_ydl_opts()
+            ydl_opts['skip_download'] = True
+            if clients:
                 ydl_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(video_url, download=False)
-                    url = extract_stream_from_info(info)
-                    if url:
-                        title = info.get('title') or 'media'
-                        return url, title
-            except Exception as e:
-                if not primary_err:
-                    primary_err = e
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+                url = extract_stream_from_info(info)
+                if url:
+                    title = info.get('title') or 'media'
+                    return url, title
+        except Exception as e:
+            if not primary_err:
+                primary_err = e
 
     # Strategy: Direct video ID search lookup fallback
     match = re.search(r'(?:v=|\/|be\/)([a-zA-Z0-9_-]{11})', video_url)
     if match:
         v_id = match.group(1)
-        for fmt in fmt_opts:
-            for clients in client_strategies:
-                try:
-                    search_opts = _get_default_ydl_opts()
-                    search_opts['skip_download'] = True
-                    if fmt:
-                        search_opts['format'] = fmt
+        for clients in client_strategies:
+            try:
+                search_opts = _get_default_ydl_opts()
+                search_opts['skip_download'] = True
+                if clients:
                     search_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients
-                    with yt_dlp.YoutubeDL(search_opts) as ydl:
-                        info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
-                        url = extract_stream_from_info(info)
-                        if url:
-                            title = info.get('title') or 'media'
-                            return url, title
-                except Exception:
-                    pass
+                with yt_dlp.YoutubeDL(search_opts) as ydl:
+                    info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
+                    url = extract_stream_from_info(info)
+                    if url:
+                        title = info.get('title') or 'media'
+                        return url, title
+            except Exception:
+                pass
 
     raise primary_err or ValueError("Could not extract media stream")
 
