@@ -26,10 +26,29 @@ import base64
 
 COOKIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
 
-def resolve_cookie_file():
+def resolve_cookie_file(user_cookies=None):
     """Resolves and writes valid cookies to a writable temp file if available."""
     writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
     
+    # 0. Check directly passed user_cookies
+    if user_cookies and user_cookies.strip():
+        val = user_cookies.strip()
+        if len(val) > 40 and not ('\t' in val or ' ' in val) and not val.startswith('#'):
+            try:
+                decoded = base64.b64decode(val).decode('utf-8', errors='ignore')
+                if '# Netscape' in decoded or '\t' in decoded or '.youtube.com' in decoded:
+                    val = decoded
+            except Exception:
+                pass
+        val = val.replace('\\n', '\n').replace('\\t', '\t').strip('"').strip("'")
+        if val and any(line and not line.startswith('#') for line in val.splitlines()):
+            try:
+                with open(writable_cookie_path, 'w', encoding='utf-8') as f:
+                    f.write(val)
+                return writable_cookie_path
+            except Exception:
+                pass
+
     # 1. Check environment variables (YOUTUBE_COOKIES, YT_COOKIES, YT_COOKIES_BASE64, COOKIES_TXT)
     env_keys = ['YOUTUBE_COOKIES', 'YT_COOKIES', 'YT_COOKIES_BASE64', 'COOKIES_TXT']
     for key in env_keys:
@@ -110,7 +129,7 @@ def fetch_youtube_visitor_data():
         pass
     return None
 
-def _get_default_ydl_opts():
+def _get_default_ydl_opts(user_cookies=None):
     opts = {
         'quiet': True,
         'no_warnings': True,
@@ -129,7 +148,7 @@ def _get_default_ydl_opts():
     if visitor_data:
         opts['extractor_args']['youtube']['visitor_data'] = [visitor_data]
 
-    cookie_file = resolve_cookie_file()
+    cookie_file = resolve_cookie_file(user_cookies)
     if cookie_file:
         opts['cookiefile'] = cookie_file
 
@@ -141,7 +160,7 @@ class DownloadManager:
     def __init__(self):
         self.jobs = {}  # job_id -> job_info dict
 
-    def extract_info(self, url):
+    def extract_info(self, url, user_cookies=None):
         """Extract metadata for YouTube, Instagram, or Spotify URLs."""
         url_lower = url.lower().strip()
         
@@ -150,9 +169,9 @@ class DownloadManager:
         elif 'instagram.com' in url_lower or 'instagr.am' in url_lower:
             return self._extract_instagram_info(url)
         else:
-            return self._extract_youtube_info(url)
+            return self._extract_youtube_info(url, user_cookies=user_cookies)
 
-    def _extract_youtube_info(self, url):
+    def _extract_youtube_info(self, url, user_cookies=None):
         """Extract metadata for a playlist or single video URL using yt-dlp with fallback client strategies."""
         info = None
         client_configs = [
@@ -164,7 +183,7 @@ class DownloadManager:
 
         last_error = None
         for clients in client_configs:
-            ydl_opts = _get_default_ydl_opts()
+            ydl_opts = _get_default_ydl_opts(user_cookies=user_cookies)
             ydl_opts['extract_flat'] = 'in_playlist'
             ydl_opts['skip_download'] = True
             ydl_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients

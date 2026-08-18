@@ -46,9 +46,27 @@ def clean_error_message(e):
     
     return clean_msg
 
+def get_request_cookies():
+    """Extract cookies from headers, query params or JSON body."""
+    # 1. Custom Header
+    header_cookie = request.headers.get('X-YouTube-Cookies') or request.headers.get('X-YT-Cookies')
+    if header_cookie:
+        return header_cookie
+    # 2. Query param
+    query_cookie = request.args.get('cookies')
+    if query_cookie:
+        return query_cookie
+    # 3. JSON body
+    if request.is_json and request.get_json():
+        body_cookie = request.get_json().get('cookies')
+        if body_cookie:
+            return body_cookie
+    return None
+
 @app.route('/api/cookies/status', methods=['GET'])
 def cookies_status():
-    cookie_path = resolve_cookie_file()
+    user_cookies = get_request_cookies()
+    cookie_path = resolve_cookie_file(user_cookies)
     has_cookies = cookie_path is not None and os.path.exists(cookie_path)
     return jsonify({
         'has_cookies': has_cookies,
@@ -74,12 +92,13 @@ def save_cookies():
 def playlist_info():
     data = request.get_json() or {}
     url = data.get('url', '').strip()
+    user_cookies = get_request_cookies()
     
     if not url:
         return jsonify({'success': False, 'error': 'Please provide a valid URL'}), 200
 
     try:
-        info = dm.extract_info(url)
+        info = dm.extract_info(url, user_cookies=user_cookies)
         return jsonify({'success': True, 'data': info})
     except Exception as e:
         return jsonify({'success': False, 'error': clean_error_message(e)}), 200
@@ -140,7 +159,7 @@ def open_folder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def _get_media_stream_url(video_url, format_type='video', quality='best'):
+def _get_media_stream_url(video_url, format_type='video', quality='best', user_cookies=None):
     def extract_stream_from_info(info):
         if not info:
             return None
@@ -194,7 +213,7 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
 
     for clients in client_strategies:
         try:
-            ydl_opts = _get_default_ydl_opts()
+            ydl_opts = _get_default_ydl_opts(user_cookies=user_cookies)
             ydl_opts['skip_download'] = True
             if clients:
                 ydl_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients
@@ -214,7 +233,7 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
         v_id = match.group(1)
         for clients in client_strategies:
             try:
-                search_opts = _get_default_ydl_opts()
+                search_opts = _get_default_ydl_opts(user_cookies=user_cookies)
                 search_opts['skip_download'] = True
                 if clients:
                     search_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients
@@ -234,12 +253,13 @@ def get_direct_stream_url():
     video_url = request.args.get('url', '').strip()
     format_type = request.args.get('format', 'video').strip()
     quality = request.args.get('quality', 'best').strip()
+    user_cookies = get_request_cookies()
 
     if not video_url:
         return jsonify({'success': False, 'error': 'URL parameter is required'}), 200
 
     try:
-        stream_url, title = _get_media_stream_url(video_url, format_type, quality)
+        stream_url, title = _get_media_stream_url(video_url, format_type, quality, user_cookies=user_cookies)
         clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
         ext = 'mp3' if format_type == 'audio' else 'mp4'
         filename = f"{clean_title}.{ext}"
@@ -259,12 +279,13 @@ def proxy_download():
     video_url = request.args.get('url', '').strip()
     format_type = request.args.get('format', 'video').strip()
     quality = request.args.get('quality', 'best').strip()
+    user_cookies = get_request_cookies()
 
     if not video_url:
         return jsonify({'error': 'URL parameter is required'}), 400
 
     try:
-        stream_url, title = _get_media_stream_url(video_url, format_type, quality)
+        stream_url, title = _get_media_stream_url(video_url, format_type, quality, user_cookies=user_cookies)
         clean_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
         ext = 'mp3' if format_type == 'audio' else 'mp4'
         filename = f"{clean_title}.{ext}"
@@ -286,7 +307,6 @@ def proxy_download():
         return Response(stream_with_context(generate()), headers=headers)
     except Exception as e:
         return jsonify({'error': clean_error_message(e)}), 400
-
 
 @app.route('/api/download/stream', methods=['GET'])
 def stream_download():
