@@ -17,8 +17,66 @@ def get_ffmpeg_path():
         pass
     return shutil.which('ffmpeg')
 
+import base64
+
 FFMPEG_PATH = get_ffmpeg_path()
 GLOBAL_COOKIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'cookies.txt')
+
+def resolve_backend_cookie_file(user_cookies=None, cookie_file_path=None):
+    writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
+    if user_cookies and user_cookies.strip():
+        try:
+            with open(writable_cookie_path, 'w', encoding='utf-8') as f:
+                f.write(user_cookies.strip())
+            return writable_cookie_path
+        except Exception:
+            pass
+
+    env_keys = ['YOUTUBE_COOKIES', 'YT_COOKIES', 'YT_COOKIES_BASE64', 'COOKIES_TXT']
+    for key in env_keys:
+        val = os.environ.get(key, '').strip()
+        if not val:
+            continue
+        if key == 'YT_COOKIES_BASE64' or (len(val) > 40 and not ('\t' in val or ' ' in val) and not val.startswith('#')):
+            try:
+                decoded = base64.b64decode(val).decode('utf-8', errors='ignore')
+                if '# Netscape' in decoded or '\t' in decoded or '.youtube.com' in decoded:
+                    val = decoded
+            except Exception:
+                pass
+        val = val.replace('\\n', '\n').replace('\\t', '\t').strip('"').strip("'")
+        if val and any(line and not line.startswith('#') for line in val.splitlines()):
+            try:
+                with open(writable_cookie_path, 'w', encoding='utf-8') as f:
+                    f.write(val)
+                return writable_cookie_path
+            except Exception:
+                pass
+
+    # Check if writable cookie file already exists with valid content
+    if os.path.exists(writable_cookie_path):
+        try:
+            with open(writable_cookie_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read().strip()
+            if any(line and not line.startswith('#') for line in content.splitlines()):
+                return writable_cookie_path
+        except Exception:
+            pass
+
+    if cookie_file_path and os.path.exists(cookie_file_path):
+        return cookie_file_path
+
+    if os.path.exists(GLOBAL_COOKIES_PATH):
+        try:
+            with open(GLOBAL_COOKIES_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read().strip()
+            if any(line and not line.startswith('#') for line in content.splitlines()):
+                shutil.copy(GLOBAL_COOKIES_PATH, writable_cookie_path)
+                return writable_cookie_path
+        except Exception:
+            pass
+
+    return None
 
 def fetch_youtube_visitor_data():
     try:
@@ -44,7 +102,7 @@ def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
         'nocolor': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web_creator', 'ios', 'mweb', 'android', 'tv']
+                'player_client': ['android', 'ios', 'tv_embedded', 'mweb', 'web_creator']
             }
         },
         'http_headers': {
@@ -56,32 +114,9 @@ def get_default_ydl_opts(user_cookies=None, cookie_file_path=None):
     if visitor_data:
         opts['extractor_args']['youtube']['visitor_data'] = [visitor_data]
 
-    writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
-    env_cookies = os.environ.get('YOUTUBE_COOKIES')
-
-    if user_cookies and user_cookies.strip():
-        temp_cookie = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt')
-        temp_cookie.write(user_cookies)
-        temp_cookie.close()
-        opts['cookiefile'] = temp_cookie.name
-    elif env_cookies and env_cookies.strip():
-        try:
-            with open(writable_cookie_path, 'w') as f:
-                f.write(env_cookies.strip())
-            opts['cookiefile'] = writable_cookie_path
-        except Exception:
-            pass
-    elif cookie_file_path and os.path.exists(cookie_file_path):
-        opts['cookiefile'] = cookie_file_path
-    elif os.path.exists(GLOBAL_COOKIES_PATH):
-        try:
-            with open(GLOBAL_COOKIES_PATH, 'r') as f:
-                content = f.read().strip()
-            if any(line and not line.startswith('#') for line in content.splitlines()):
-                shutil.copy(GLOBAL_COOKIES_PATH, writable_cookie_path)
-                opts['cookiefile'] = writable_cookie_path
-        except Exception:
-            pass
+    cookie_file = resolve_backend_cookie_file(user_cookies, cookie_file_path)
+    if cookie_file:
+        opts['cookiefile'] = cookie_file
 
     if shutil.which('node'):
         opts['js_runtimes'] = {'node': {}}

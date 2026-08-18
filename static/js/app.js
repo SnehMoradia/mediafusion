@@ -26,6 +26,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const overallText = document.getElementById('overall-text');
     const cancelJobBtn = document.getElementById('cancel-job-btn');
 
+    // Cookie Modal Elements
+    const cookieGuideBtn = document.getElementById('cookie-guide-btn');
+    const cookieStatusDot = document.getElementById('cookie-status-dot');
+    const cookieStatusText = document.getElementById('cookie-status-text');
+    const cookieModal = document.getElementById('cookie-modal');
+    const closeCookieModalBtn = document.getElementById('close-cookie-modal');
+    const cookieTextarea = document.getElementById('cookie-textarea');
+    const saveCookiesBtn = document.getElementById('save-cookies-btn');
+
     let playlistData = null;
     let activeJobId = null;
     let pollInterval = null;
@@ -33,6 +42,80 @@ document.addEventListener('DOMContentLoaded', () => {
     let isCloudDeployment = false;
 
     let defaultOutputDir = '';
+
+    // Check Cookie Status
+    async function checkCookieStatus() {
+        try {
+            const res = await fetch('/api/cookies/status');
+            const data = await res.json();
+            if (data.has_cookies) {
+                if (cookieStatusDot) {
+                    cookieStatusDot.className = 'status-dot dot-green';
+                }
+                if (cookieStatusText) {
+                    cookieStatusText.textContent = '🍪 Cookies Active';
+                }
+            } else {
+                if (cookieStatusDot) {
+                    cookieStatusDot.className = 'status-dot dot-amber';
+                }
+                if (cookieStatusText) {
+                    cookieStatusText.textContent = '🍪 Cloud Cookies Setup';
+                }
+            }
+        } catch (e) {
+            console.error('Failed to check cookie status', e);
+        }
+    }
+    checkCookieStatus();
+
+    // Cookie Modal Listeners
+    if (cookieGuideBtn) {
+        cookieGuideBtn.addEventListener('click', () => {
+            if (cookieModal) cookieModal.style.display = 'flex';
+        });
+    }
+
+    if (closeCookieModalBtn) {
+        closeCookieModalBtn.addEventListener('click', () => {
+            if (cookieModal) cookieModal.style.display = 'none';
+        });
+    }
+
+    if (cookieModal) {
+        cookieModal.addEventListener('click', (e) => {
+            if (e.target === cookieModal) cookieModal.style.display = 'none';
+        });
+    }
+
+    if (saveCookiesBtn) {
+        saveCookiesBtn.addEventListener('click', async () => {
+            const val = cookieTextarea ? cookieTextarea.value.trim() : '';
+            if (!val) return alert('Please paste cookie file contents.');
+            saveCookiesBtn.disabled = true;
+            saveCookiesBtn.textContent = 'Saving...';
+            try {
+                const res = await fetch('/api/cookies/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cookies: val })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Cookies saved successfully for this session!');
+                    checkCookieStatus();
+                    if (cookieModal) cookieModal.style.display = 'none';
+                } else {
+                    alert('Error saving cookies: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Failed to save cookies: ' + err.message);
+            } finally {
+                saveCookiesBtn.disabled = false;
+                saveCookiesBtn.textContent = 'Save Cookies for Session';
+            }
+        });
+    }
 
     // Load default output folder
     fetch('/api/default-folder')
@@ -78,6 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const json = await res.json();
             if (!res.ok || json.error) {
+                if (json.error && json.error.includes('cookies')) {
+                    if (cookieModal) cookieModal.style.display = 'flex';
+                }
                 throw new Error(json.error || 'Failed to extract playlist info');
             }
 
@@ -236,13 +322,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (percentEl) percentEl.textContent = `${percent}%`;
                         }
                     });
-                } else {
-                    throw new Error('Stream URL not available');
-                }
             } catch (err) {
                 console.warn(`Stream extraction fallback: ${err.message}`);
-                const fallbackUrl = `/api/download/proxy?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
-                window.location.href = fallbackUrl;
+                if (err.message && (err.message.toLowerCase().includes('bot') || err.message.toLowerCase().includes('cookie') || err.message.toLowerCase().includes('restricted'))) {
+                    if (cookieModal) cookieModal.style.display = 'flex';
+                    alert(err.message);
+                } else {
+                    const fallbackUrl = `/api/download/proxy?url=${encodedUrl}&format=${formatSelect.value}&quality=${qualitySelect.value}`;
+                    window.location.href = fallbackUrl;
+                }
             } finally {
                 button.style.pointerEvents = 'auto';
                 button.style.opacity = '1';

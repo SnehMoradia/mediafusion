@@ -22,7 +22,75 @@ def _get_ffmpeg_path():
 
 FFMPEG_PATH = _get_ffmpeg_path()
 
+import base64
+
 COOKIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
+
+def resolve_cookie_file():
+    """Resolves and writes valid cookies to a writable temp file if available."""
+    writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
+    
+    # 1. Check environment variables (YOUTUBE_COOKIES, YT_COOKIES, YT_COOKIES_BASE64, COOKIES_TXT)
+    env_keys = ['YOUTUBE_COOKIES', 'YT_COOKIES', 'YT_COOKIES_BASE64', 'COOKIES_TXT']
+    for key in env_keys:
+        val = os.environ.get(key, '').strip()
+        if not val:
+            continue
+            
+        # Check if base64 encoded
+        if key == 'YT_COOKIES_BASE64' or (len(val) > 40 and not ('\t' in val or ' ' in val) and not val.startswith('#')):
+            try:
+                decoded = base64.b64decode(val).decode('utf-8', errors='ignore')
+                if '# Netscape' in decoded or '\t' in decoded or '.youtube.com' in decoded:
+                    val = decoded
+            except Exception:
+                pass
+        
+        # Unescape literal \n and \t if stored as escaped string in env vars
+        val = val.replace('\\n', '\n').replace('\\t', '\t').strip('"').strip("'")
+        
+        if val and any(line and not line.startswith('#') for line in val.splitlines()):
+            try:
+                with open(writable_cookie_path, 'w', encoding='utf-8') as f:
+                    f.write(val)
+                return writable_cookie_path
+            except Exception:
+                pass
+
+    # 2. Check if writable temp cookie file already exists and has valid cookies
+    if os.path.exists(writable_cookie_path):
+        try:
+            with open(writable_cookie_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read().strip()
+            if any(line and not line.startswith('#') for line in content.splitlines()):
+                return writable_cookie_path
+        except Exception:
+            pass
+
+    # 3. Check candidate local file paths
+    candidate_paths = [
+        COOKIES_PATH,
+        os.path.join(os.getcwd(), 'cookies.txt'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt'),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cookies.txt'),
+        '/var/task/cookies.txt'
+    ]
+    
+    for c_path in candidate_paths:
+        if os.path.exists(c_path):
+            try:
+                with open(c_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read().strip()
+                if any(line and not line.startswith('#') for line in content.splitlines()):
+                    try:
+                        shutil.copy(c_path, writable_cookie_path)
+                        return writable_cookie_path
+                    except Exception:
+                        return c_path
+            except Exception:
+                pass
+
+    return None
 
 def fetch_youtube_visitor_data():
     """Dynamically fetch YouTube visitor_data from YouTube embed to bypass datacenter IP restrictions."""
@@ -49,7 +117,7 @@ def _get_default_ydl_opts():
         'nocolor': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['web_creator', 'ios', 'mweb', 'android', 'tv'],
+                'player_client': ['android', 'ios', 'tv_embedded', 'mweb', 'web_creator'],
             }
         },
         'http_headers': {
@@ -61,25 +129,9 @@ def _get_default_ydl_opts():
     if visitor_data:
         opts['extractor_args']['youtube']['visitor_data'] = [visitor_data]
 
-    env_cookies = os.environ.get('YOUTUBE_COOKIES')
-    writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
-
-    if env_cookies and env_cookies.strip():
-        try:
-            with open(writable_cookie_path, 'w') as f:
-                f.write(env_cookies.strip())
-            opts['cookiefile'] = writable_cookie_path
-        except Exception:
-            pass
-    elif os.path.exists(COOKIES_PATH):
-        try:
-            with open(COOKIES_PATH, 'r') as f:
-                content = f.read().strip()
-            if any(line and not line.startswith('#') for line in content.splitlines()):
-                shutil.copy(COOKIES_PATH, writable_cookie_path)
-                opts['cookiefile'] = writable_cookie_path
-        except Exception:
-            pass
+    cookie_file = resolve_cookie_file()
+    if cookie_file:
+        opts['cookiefile'] = cookie_file
 
     if shutil.which('node'):
         opts['js_runtimes'] = {'node': {}}
@@ -104,8 +156,9 @@ class DownloadManager:
         """Extract metadata for a playlist or single video URL using yt-dlp with fallback client strategies."""
         info = None
         client_configs = [
+            ['android', 'ios'],
             ['ios', 'mweb', 'android', 'tv'],
-            ['tv', 'mweb'],
+            ['tv_embedded', 'mweb'],
             ['web_creator', 'android']
         ]
 
@@ -114,7 +167,7 @@ class DownloadManager:
             ydl_opts = _get_default_ydl_opts()
             ydl_opts['extract_flat'] = 'in_playlist'
             ydl_opts['skip_download'] = True
-            ydl_opts['extractor_args'] = {'youtube': {'player_client': clients}}
+            ydl_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)

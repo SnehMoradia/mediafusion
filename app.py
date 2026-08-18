@@ -31,19 +31,44 @@ def get_default_folder():
         return jsonify({'is_cloud': False, 'path': default_dir})
 
 import re
+from downloader import resolve_cookie_file
 
 def clean_error_message(e):
     err_str = str(e)
     clean_msg = re.sub(r'\x1b\[[0-9;]*[mGKS]', '', err_str).strip()
     
-    if "Sign in to confirm you're not a bot" in clean_msg:
-        return "YouTube restricted cloud access for this video (bot check). Please run the app locally on http://localhost:5050 or add a cookies.txt file."
-    elif "Video unavailable" in clean_msg or "This video is unavailable" in clean_msg:
+    if re.search(r"Sign in to confirm you['\u2019]re not a bot", clean_msg, re.IGNORECASE):
+        return "YouTube restricted cloud/datacenter access for this video (Bot Check). To fix this on Vercel/Cloud: Add your exported YouTube cookies to the 'YOUTUBE_COOKIES' environment variable in Vercel settings (or paste into cookies.txt). Alternatively, run the app locally on localhost:5050."
+    elif re.search(r"(?:This\s+)?video is unavailable", clean_msg, re.IGNORECASE):
         return "This video is unavailable or has been removed from YouTube."
     elif clean_msg.startswith("ERROR: [youtube]"):
         clean_msg = re.sub(r'^ERROR:\s*\[youtube\]\s*[\w-]+:\s*', '', clean_msg)
     
     return clean_msg
+
+@app.route('/api/cookies/status', methods=['GET'])
+def cookies_status():
+    cookie_path = resolve_cookie_file()
+    has_cookies = cookie_path is not None and os.path.exists(cookie_path)
+    return jsonify({
+        'has_cookies': has_cookies,
+        'message': 'Cookies active and configured' if has_cookies else 'No active YouTube cookies configured'
+    })
+
+@app.route('/api/cookies/save', methods=['POST'])
+def save_cookies():
+    data = request.get_json() or {}
+    raw_cookies = data.get('cookies', '').strip()
+    if not raw_cookies:
+        return jsonify({'success': False, 'error': 'Cookie content is empty'}), 400
+
+    writable_cookie_path = os.path.join(tempfile.gettempdir(), 'yt_writable_cookies.txt')
+    try:
+        with open(writable_cookie_path, 'w', encoding='utf-8') as f:
+            f.write(raw_cookies)
+        return jsonify({'success': True, 'message': 'Cookies saved for this session'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/playlist-info', methods=['POST'])
 def playlist_info():
@@ -115,8 +140,6 @@ def open_folder():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-from flask import Flask, request, jsonify, render_template, send_file, after_this_request, Response, stream_with_context
-
 def _get_media_stream_url(video_url, format_type='video', quality='best'):
     def extract_stream_from_info(info):
         if not info:
@@ -145,8 +168,9 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
     primary_err = None
 
     client_strategies = [
+        ['android', 'ios'],
         ['ios', 'mweb', 'android', 'tv'],
-        ['tv', 'mweb'],
+        ['tv_embedded', 'mweb'],
         ['web_creator', 'android']
     ]
 
@@ -157,11 +181,7 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
                 ydl_opts['skip_download'] = True
                 if fmt:
                     ydl_opts['format'] = fmt
-                ydl_opts['extractor_args'] = {
-                    'youtube': {
-                        'player_client': clients
-                    }
-                }
+                ydl_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(video_url, download=False)
                     url = extract_stream_from_info(info)
@@ -183,11 +203,7 @@ def _get_media_stream_url(video_url, format_type='video', quality='best'):
                     search_opts['skip_download'] = True
                     if fmt:
                         search_opts['format'] = fmt
-                    search_opts['extractor_args'] = {
-                        'youtube': {
-                            'player_client': clients
-                        }
-                    }
+                    search_opts.setdefault('extractor_args', {}).setdefault('youtube', {})['player_client'] = clients
                     with yt_dlp.YoutubeDL(search_opts) as ydl:
                         info = ydl.extract_info(f"https://www.youtube.com/watch?v={v_id}", download=False)
                         url = extract_stream_from_info(info)

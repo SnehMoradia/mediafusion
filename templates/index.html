@@ -12,9 +12,15 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <div class="brand-badge">
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-                Universal Downloader Pro
+            <div class="header-top-row">
+                <div class="brand-badge">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                    Universal Downloader Pro
+                </div>
+                <button id="cookie-guide-btn" class="cookie-status-badge" title="Configure cookies for Cloud/Vercel bypass">
+                    <span id="cookie-status-dot" class="status-dot dot-gray"></span>
+                    <span id="cookie-status-text">🍪 Cloud Cookies</span>
+                </button>
             </div>
             <h1 class="app-title">YouTube, Instagram & Spotify Downloader</h1>
             <p class="app-subtitle">Download YouTube playlists/videos, Instagram reels/posts, and Spotify tracks/albums in HD MP4 or 320kbps MP3 audio.</p>
@@ -114,6 +120,52 @@
             </div>
             <div id="overall-text" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-sub);">
                 Downloading 0 / 0 items
+            </div>
+        </div>
+    </div>
+
+    <!-- Cloud Cookies & Setup Modal -->
+    <div id="cookie-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.25rem;">🍪</span>
+                    <h3 style="font-size: 1.15rem; font-weight: 700;">Cloud & YouTube Cookie Setup</h3>
+                </div>
+                <button id="close-cookie-modal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-sub); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
+                    When deployed to cloud hosts (Vercel, Render, AWS), YouTube restricts datacenter IPs with <em>"Sign in to confirm you're not a bot"</em>. Adding your YouTube cookies fixes this immediately.
+                </p>
+
+                <div class="setup-steps">
+                    <div class="step-item">
+                        <div class="step-num">1</div>
+                        <div class="step-content">
+                            <strong>Export YouTube Cookies:</strong>
+                            <p>Install the <strong>"Get cookies.txt LOCALLY"</strong> Chrome/Firefox extension and export your YouTube cookies.</p>
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-num">2</div>
+                        <div class="step-content">
+                            <strong>Add to Vercel (Permanent):</strong>
+                            <p>Go to Vercel Dashboard &rarr; <em>Settings</em> &rarr; <em>Environment Variables</em> &rarr; Add <code class="code-pill">YOUTUBE_COOKIES</code> with your cookie text, then redeploy.</p>
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-num">3</div>
+                        <div class="step-content">
+                            <strong>Or Quick Paste (Session Test):</strong>
+                            <p>Paste your Netscape formatted cookie text below to test right now:</p>
+                            <textarea id="cookie-textarea" class="cookie-textarea" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com    TRUE    /    TRUE    ..."></textarea>
+                            <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                                <button id="save-cookies-btn" class="btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem;">Save Cookies for Session</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
