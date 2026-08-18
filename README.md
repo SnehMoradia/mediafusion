@@ -47,6 +47,3 @@ python app.py
 Open your browser at `http://127.0.0.1:5050`.
 
 ---
-
-## 🔑 Cookies Support (Optional)
-If YouTube presents bot check errors (*"Sign in to confirm you're not a bot"*), place your exported Netscape-format `cookies.txt` file in the project root directory. The downloader automatically detects and uses it.
