@@ -322,6 +322,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (percentEl) percentEl.textContent = `${percent}%`;
                         }
                     });
+                } else {
+                    throw new Error('Stream URL not available');
+                }
             } catch (err) {
                 console.warn(`Stream extraction fallback: ${err.message}`);
                 if (err.message && (err.message.toLowerCase().includes('bot') || err.message.toLowerCase().includes('cookie') || err.message.toLowerCase().includes('restricted'))) {
