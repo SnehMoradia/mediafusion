@@ -23,8 +23,68 @@ def _get_ffmpeg_path():
 FFMPEG_PATH = _get_ffmpeg_path()
 
 import base64
+import json
+import time
 
 COOKIES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
+
+def normalize_to_netscape(content):
+    """Automatically converts JSON cookies or raw cookie headers to Netscape format."""
+    if not content or not content.strip():
+        return ''
+    raw = content.strip()
+    if raw.startswith('[') and raw.endswith(']'):
+        try:
+            items = json.loads(raw)
+            lines = ['# Netscape HTTP Cookie File']
+            for item in items:
+                domain = item.get('domain', '.youtube.com')
+                flag = 'TRUE' if domain.startswith('.') else 'FALSE'
+                path = item.get('path', '/')
+                secure = 'TRUE' if item.get('secure', True) else 'FALSE'
+                expiry = int(item.get('expirationDate') or (time.time() + 31536000))
+                name = item.get('name', '')
+                value = item.get('value', '')
+                if name and value:
+                    lines.append(f'{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t{name}\t{value}')
+            return '\n'.join(lines)
+        except Exception:
+            pass
+
+    if '=' in raw and '\t' not in raw and not raw.startswith('#'):
+        pairs = [p.strip() for p in raw.split(';') if '=' in p]
+        if pairs:
+            lines = ['# Netscape HTTP Cookie File']
+            expiry = int(time.time() + 31536000)
+            for pair in pairs:
+                k, v = pair.split('=', 1)
+                k = k.strip()
+                v = v.strip()
+                if k and v:
+                    lines.append(f'.youtube.com\tTRUE\t/\tTRUE\t{expiry}\t{k}\t{v}')
+            return '\n'.join(lines)
+
+    lines = []
+    if not raw.startswith('#'):
+        lines.append('# Netscape HTTP Cookie File')
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith('#'):
+            lines.append(line)
+            continue
+        parts = re.split(r'\t+|\s{2,}', line)
+        if len(parts) >= 7:
+            lines.append('\t'.join(parts[:7]))
+        elif len(parts) == 6:
+            domain, path, secure, expiry, name, value = parts
+            flag = 'TRUE' if domain.startswith('.') else 'FALSE'
+            lines.append(f'{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t{name}\t{value}')
+        else:
+            lines.append(line)
+            
+    return '\n'.join(lines)
 
 def resolve_cookie_file(user_cookies=None):
     """Resolves and writes valid cookies to a writable temp file if available."""
@@ -41,6 +101,7 @@ def resolve_cookie_file(user_cookies=None):
             except Exception:
                 pass
         val = val.replace('\\n', '\n').replace('\\t', '\t').strip('"').strip("'")
+        val = normalize_to_netscape(val)
         if val and any(line and not line.startswith('#') for line in val.splitlines()):
             try:
                 with open(writable_cookie_path, 'w', encoding='utf-8') as f:
