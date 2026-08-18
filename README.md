@@ -8,7 +8,7 @@ A fast, responsive web application for downloading YouTube playlists, single vid
 
 - **Multi-Platform Support**: YouTube Playlists, Individual Videos, Audio extraction (MP3 / Best Quality).
 - **Direct Browser Streaming & Local Folder Downloads**: Stream and download media directly in the browser or save to your local folder.
-- **YouTube Bot Bypass**: Built-in cookie management and authentication support (`cookies.txt` and custom cookie injection) to bypass bot checks.
+- **YouTube Authentication**: Automatic cookie file detection (`cookies.txt`) in the project root to handle age-restricted videos and bot checks.
 - **Modern Responsive UI**: Clean, glassmorphic dark theme with live download progress tracking.
 
 ---
@@ -48,5 +48,5 @@ Open your browser at `http://127.0.0.1:5050`.
 
 ---
 
-## 🔑 Custom Cookies Support
-If YouTube presents bot check errors (*"Sign in to confirm you're not a bot"*), click the **Custom Cookies** button in the web interface and paste your exported Netscape-format `cookies.txt` or JSON cookies. Cookies are sent securely with your extraction and download requests.
+## 🔑 Cookies Support (Optional)
+If YouTube presents bot check errors (*"Sign in to confirm you're not a bot"*), place your exported Netscape-format `cookies.txt` file in the project root directory. The downloader automatically detects and uses it.
