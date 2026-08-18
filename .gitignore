@@ -25,6 +25,3 @@ downloads_test/
 .idea/
 .DS_Store
 Thumbs.db
-
-# Vercel
-.vercel

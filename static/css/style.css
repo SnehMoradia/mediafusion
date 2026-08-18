@@ -629,47 +629,6 @@ body::after {
   justify-content: center;
 }
 
-.cookie-status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.9rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-card);
-  border-radius: 9999px;
-  color: var(--text-sub);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.cookie-status-badge:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: var(--text-main);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.dot-green {
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
-}
-
-.dot-amber {
-  background: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
-}
-
-.dot-gray {
-  background: #64748b;
-}
 
 /* Modal Styling */
 .modal-overlay {

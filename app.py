@@ -38,7 +38,7 @@ def clean_error_message(e):
     clean_msg = re.sub(r'\x1b\[[0-9;]*[mGKS]', '', err_str).strip()
     
     if re.search(r"Sign in to confirm you['\u2019]re not a bot", clean_msg, re.IGNORECASE):
-        return "YouTube restricted cloud/datacenter access for this video (Bot Check). To fix this on Vercel/Cloud: Add your exported YouTube cookies to the 'YOUTUBE_COOKIES' environment variable in Vercel settings (or paste into cookies.txt). Alternatively, run the app locally on localhost:5050."
+        return "YouTube bot check triggered for this video. To fix this, provide your exported YouTube cookies in Custom Cookies or paste into cookies.txt. Alternatively, run the app locally on localhost:5050."
     elif re.search(r"(?:This\s+)?video is unavailable", clean_msg, re.IGNORECASE):
         return "This video is unavailable or has been removed from YouTube."
     elif clean_msg.startswith("ERROR: [youtube]"):

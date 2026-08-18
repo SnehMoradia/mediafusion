@@ -26,119 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const overallText = document.getElementById('overall-text');
     const cancelJobBtn = document.getElementById('cancel-job-btn');
 
-    // Cookie Modal Elements
-    const cookieGuideBtn = document.getElementById('cookie-guide-btn');
-    const cookieStatusDot = document.getElementById('cookie-status-dot');
-    const cookieStatusText = document.getElementById('cookie-status-text');
-    const cookieModal = document.getElementById('cookie-modal');
-    const closeCookieModalBtn = document.getElementById('close-cookie-modal');
-    const cookieTextarea = document.getElementById('cookie-textarea');
-    const saveCookiesBtn = document.getElementById('save-cookies-btn');
-
     let playlistData = null;
     let activeJobId = null;
     let pollInterval = null;
 
     let isCloudDeployment = false;
     let defaultOutputDir = '';
-
-    function getBase64Cookie() {
-        const c = localStorage.getItem('youtube_cookies') || '';
-        if (!c) return '';
-        try {
-            return btoa(unescape(encodeURIComponent(c)));
-        } catch (e) {
-            return '';
-        }
-    }
-
-    function getCookieHeaders() {
-        const b64 = getBase64Cookie();
-        return b64 ? { 'X-YouTube-Cookies': b64 } : {};
-    }
-
-    function getCookieParam() {
-        const c = localStorage.getItem('youtube_cookies') || '';
-        return c ? `&cookies=${encodeURIComponent(c)}` : '';
-    }
-
-    // Check Cookie Status
-    async function checkCookieStatus() {
-        const storedCookies = localStorage.getItem('youtube_cookies') || '';
-        if (cookieTextarea && storedCookies && !cookieTextarea.value) {
-            cookieTextarea.value = storedCookies;
-        }
-
-        if (storedCookies) {
-            if (cookieStatusDot) cookieStatusDot.className = 'status-dot dot-green';
-            if (cookieStatusText) cookieStatusText.textContent = '🍪 Cookies Active';
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/cookies/status');
-            const data = await res.json();
-            if (data.has_cookies) {
-                if (cookieStatusDot) cookieStatusDot.className = 'status-dot dot-green';
-                if (cookieStatusText) cookieStatusText.textContent = '🍪 Cookies Active';
-            } else {
-                if (cookieStatusDot) cookieStatusDot.className = 'status-dot dot-amber';
-                if (cookieStatusText) cookieStatusText.textContent = '🍪 Cloud Cookies Setup';
-            }
-        } catch (e) {
-            console.error('Failed to check cookie status', e);
-        }
-    }
-    checkCookieStatus();
-
-    // Cookie Modal Listeners
-    if (cookieGuideBtn) {
-        cookieGuideBtn.addEventListener('click', () => {
-            const storedCookies = localStorage.getItem('youtube_cookies') || '';
-            if (cookieTextarea && storedCookies) cookieTextarea.value = storedCookies;
-            if (cookieModal) cookieModal.style.display = 'flex';
-        });
-    }
-
-    if (closeCookieModalBtn) {
-        closeCookieModalBtn.addEventListener('click', () => {
-            if (cookieModal) cookieModal.style.display = 'none';
-        });
-    }
-
-    if (cookieModal) {
-        cookieModal.addEventListener('click', (e) => {
-            if (e.target === cookieModal) cookieModal.style.display = 'none';
-        });
-    }
-
-    if (saveCookiesBtn) {
-        saveCookiesBtn.addEventListener('click', async () => {
-            const val = cookieTextarea ? cookieTextarea.value.trim() : '';
-            if (!val) return alert('Please paste cookie file contents.');
-            saveCookiesBtn.disabled = true;
-            saveCookiesBtn.textContent = 'Saving...';
-            try {
-                localStorage.setItem('youtube_cookies', val);
-                checkCookieStatus();
-
-                const res = await fetch('/api/cookies/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...getCookieHeaders() },
-                    body: JSON.stringify({ cookies: val })
-                });
-                await res.json();
-                alert('Cookies saved successfully! Cloud bot check is now bypassed.');
-                if (cookieModal) cookieModal.style.display = 'none';
-            } catch (err) {
-                alert('Cookies stored in browser session successfully!');
-                if (cookieModal) cookieModal.style.display = 'none';
-            } finally {
-                saveCookiesBtn.disabled = false;
-                saveCookiesBtn.textContent = 'Save Cookies for Session';
-            }
-        });
-    }
 
     // Load default output folder
     fetch('/api/default-folder')
